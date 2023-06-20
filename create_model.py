@@ -1,5 +1,5 @@
 import argparse
-from model.transformer_model import TransformerModel
+from model.full_model import TransformerModel
 
 def create_model(src_vocab_size: int,
                  tgt_vocab_size: int,
