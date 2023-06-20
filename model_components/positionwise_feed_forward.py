@@ -10,8 +10,8 @@ class PositionwiseFeedForward(nn.Module):
         super(PositionwiseFeedForward, self).__init__()
         self.linear_layer_1  =  nn.Linear(d_model, d_ff)
         self.relu_1          =  nn.ReLU(inplace=True)
-        self.linear_layer_2  =  nn.Linear(d_ff, d_model)
         self.dropout_layer   =  nn.Dropout(dropout_prob)
+        self.linear_layer_2  =  nn.Linear(d_ff, d_model)
 
     def forward(self, x):
         '''
