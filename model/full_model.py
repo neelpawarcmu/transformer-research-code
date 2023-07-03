@@ -121,6 +121,9 @@ class EncoderStack(nn.Module):
             encoder_layer_list.append(encoder_layer_i)
         self.encoder_layers = nn.ModuleList(encoder_layer_list)
 
+        # layer normalization
+        self.norm_layer = LayerNorm(d_model)
+
     def forward(self, x):
         "Pass the input through each layer in turn."
         layer_input = x
@@ -130,7 +133,8 @@ class EncoderStack(nn.Module):
             # this becomes input to next layer
             layer_input = layer_output
 
-        return layer_output
+        normed_output = self.norm_layer(layer_output)
+        return normed_output
 
 
 class DecoderStack(nn.Module):
@@ -147,6 +151,9 @@ class DecoderStack(nn.Module):
             decoder_layer_list.append(decoder_layer_i)
         self.decoder_layers = nn.ModuleList(decoder_layer_list)
 
+        # layer normalization
+        self.norm_layer = LayerNorm(d_model)
+
     def forward(self, x, memory, decoder_attn_mask):
         layer_input = x
         for layer in self.decoder_layers:
@@ -155,7 +162,8 @@ class DecoderStack(nn.Module):
             # this becomes input to next layer
             layer_input = layer_output
 
-        return layer_output
+        normed_output = self.norm_layer(layer_output)
+        return normed_output
 
 
 class Sublayer(nn.Module):
@@ -172,19 +180,18 @@ class Sublayer(nn.Module):
         self.dropout_layer = nn.Dropout(p = dropout_prob)
 
     def forward(self, x, mask=None, memory=None): # x is representation / embedding
+        normed_x = self.norm_layer(x)
         if mask is not None: # decoder self attention sublayer
-            workhorse_output = self.workhorse(x, mask)
+            workhorse_output = self.workhorse(normed_x, mask)
         elif memory is not None: # decoder cross attention sublayer
-            workhorse_output = self.workhorse(x, memory)
+            workhorse_output = self.workhorse(normed_x, memory)
         else: # encoder or feedforward sublayer
-            workhorse_output = self.workhorse(x)
+            workhorse_output = self.workhorse(normed_x)
         # apply dropout
         dropout_output = self.dropout_layer(workhorse_output)
         # residual connection
         residual_output = x + dropout_output
-        # layer norm
-        sublayer_output = self.norm_layer(residual_output)
-        return sublayer_output
+        return residual_output
 
 class LayerNorm(nn.Module):
     "Construct a layernorm module (See citation for details)."
