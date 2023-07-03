@@ -92,11 +92,11 @@ def build_vocabulary(spacy_de, spacy_en):
 
 
 def load_vocab(spacy_de, spacy_en):
-    if not exists("vocab.pt"):
+    if not exists("artifacts/saved_vocab/vocab.pt"):
         vocab_src, vocab_tgt = build_vocabulary(spacy_de, spacy_en)
-        torch.save((vocab_src, vocab_tgt), "vocab.pt")
+        torch.save((vocab_src, vocab_tgt), "artifacts/saved_vocab/vocab.pt")
     else:
-        vocab_src, vocab_tgt = torch.load("vocab.pt")
+        vocab_src, vocab_tgt = torch.load("artifacts/saved_vocab/vocab.pt")
     print("Finished.\nVocabulary sizes:")
     print(len(vocab_src))
     print(len(vocab_tgt))

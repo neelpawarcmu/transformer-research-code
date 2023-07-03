@@ -70,7 +70,7 @@ def create_config(vocab_src, vocab_tgt, args):
         "base_lr": 1.0,
         "max_padding": 72,
         "warmup": 3000,
-        "model_save_name": "multi30k_model",
+        "model_save_name": "artifacts/saved_models/multi30k_model",
         "src_vocab_size": len(vocab_src),
         "tgt_vocab_size": len(vocab_tgt),
     }
@@ -88,13 +88,13 @@ def get_learning_rate(step_num, d_model, factor, warmup):
 def train(train_dataloader, valid_dataloader, model, criterion, 
           optimizer, scheduler, config):
     
-    # create batched data loaders
-    batched_train_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
-                                for b in train_dataloader)
-    batched_valid_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
-                                for b in valid_dataloader)
 
     for epoch in range(config["num_epochs"]):
+        # create batched data loaders
+        batched_train_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
+                                    for b in train_dataloader)
+        batched_valid_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
+                                    for b in valid_dataloader)
         # initialize timer
         start = time.time()
         # training
@@ -102,10 +102,16 @@ def train(train_dataloader, valid_dataloader, model, criterion,
                                      scheduler, config["accum_iter"])
         # validation
         valid_loss = run_valid_epoch(batched_valid_dataloader, model, criterion)
-        del src, tgt, decoder_attn_mask
-        print(f"Epoch: {epoch} | Average training loss: {train_loss} \
-              | Average validation loss: {valid_loss} | Time taken: {time.time() - start}")
-        print("="*20)
+        print(f"Epoch: {epoch} | "
+              f"Average training loss: {train_loss / len(train_dataloader):.3f} | "
+              f"Average validation loss: {valid_loss / len(valid_dataloader):.3f} | "
+              f"Time taken: {1/60*(time.time() - start):.2f} min")
+        print("="*80)
+
+        # save model
+        torch.save(model.state_dict(), f'{config["model_save_name"]}_epoch_{epoch}.pt')
+
+
 
 
 def run_train_epoch(batched_train_dataloader, model, criterion, optimizer, scheduler, 
@@ -113,44 +119,39 @@ def run_train_epoch(batched_train_dataloader, model, criterion, optimizer, sched
     # put model in training mode
     model.train()
     # iterate over the training data and compute losses
+    total_loss = 0
     for i, batch in enumerate(batched_train_dataloader):
-        # move tensors to same device as model
-        src = batch.src.to(device)
-        tgt = batch.tgt.to(device)
-        decoder_attn_mask = batch.decoder_attn_mask.to(device)
-        output_probabilities = model.forward(src, tgt, decoder_attn_mask)
+        output_probabilities = model.forward(batch.src, batch.tgt, batch.decoder_attn_mask)
         loss, loss_node = criterion(output_probabilities, batch.tgt_y, batch.ntokens)
-        total_loss += loss
         loss_node.backward()
         if i % accum_iter == 0:
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
+        total_loss += loss / batch.ntokens
         scheduler.step()
-        del src, tgt, decoder_attn_mask
-        print(f"Step: {i} | Training loss: {loss:.3f} | Learning rate: \
-              {optimizer.param_groups[0]['lr']}")
+        
+        # print metrics
+        if i % 100 == 0:
+            print(f"Step: {i} \t|\t Training loss: {loss/batch.ntokens:.3f} \t|\t"
+                  f"Learning rate: {optimizer.param_groups[0]['lr']:.2e}")
 
-    epoch_loss = total_loss / len(batched_train_dataloader)
-    return epoch_loss
+    return total_loss
 
 def run_valid_epoch(batched_valid_dataloader, model, criterion):
     # put model in evaluation mode
     model.eval()
     # iterate over the validation data and compute losses
+    total_loss = 0
     for i, batch in enumerate(batched_valid_dataloader):
-        src = batch.src.to(device)
-        tgt = batch.tgt.to(device)
-        decoder_attn_mask = batch.decoder_attn_mask.to(device)
-        output_probabilities = model.forward(src, tgt, decoder_attn_mask)
+        output_probabilities = model.forward(batch.src, batch.tgt, batch.decoder_attn_mask)
         loss, loss_node = criterion(output_probabilities, batch.tgt_y, batch.ntokens)
-        total_loss += loss
+        total_loss += loss / batch.ntokens
     
-    epoch_loss = total_loss / len(batched_valid_dataloader)
-    return epoch_loss
+    return total_loss
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=2)
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -168,8 +169,9 @@ if __name__ == "__main__":
     # load data
     train_dataloader, valid_dataloader = create_dataloaders(device, vocab_src, 
                                                             vocab_tgt, spacy_de, 
-                                                            spacy_en, batch_size=12000, 
-                                                            max_padding=128)
+                                                            spacy_en, 
+                                                            batch_size=config["batch_size"], 
+                                                            max_padding=config["max_padding"])
 
     # create loss criterion, learning rate optimizer and scheduler
     label_smoothing = LabelSmoothing(config["tgt_vocab_size"], config["pad_idx"], 0.1)

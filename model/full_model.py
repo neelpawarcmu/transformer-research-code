@@ -1,6 +1,7 @@
 import math
 import torch
 import torch.nn as nn
+from torch.nn.functional import log_softmax
 
 class TransformerModel(nn.Module):
     def __init__(self, src_vocab_size, tgt_vocab_size, N=6, d_model=512, d_ff=2048,
