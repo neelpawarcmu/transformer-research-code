@@ -166,7 +166,7 @@ def collate_batch(
     return (src, tgt)
 
 def create_dataloaders(device, vocab_src, vocab_tgt, spacy_de, 
-                       spacy_en, batch_size=12000, max_padding=128):
+                       spacy_en, shuffle=True, batch_size=12000, max_padding=128):
     def tokenize_de(text):
         return tokenize(text, spacy_de)
 
@@ -195,13 +195,13 @@ def create_dataloaders(device, vocab_src, vocab_tgt, spacy_de,
     train_dataloader = DataLoader(
         train_iter_map,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=shuffle,
         collate_fn=collate_fn,
     )
     valid_dataloader = DataLoader(
         valid_iter_map,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=shuffle,
         collate_fn=collate_fn,
     )
     return train_dataloader, valid_dataloader

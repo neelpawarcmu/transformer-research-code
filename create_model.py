@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.optim.lr_scheduler import LambdaLR
 from model.full_model import TransformerModel
 from dataset_utils import load_tokenizers, load_vocab, create_dataloaders, Batch
+import matplotlib.pyplot as plt
 
 class LabelSmoothing(nn.Module):
     """
@@ -88,8 +89,8 @@ def get_learning_rate(step_num, d_model, factor, warmup):
 def train(train_dataloader, valid_dataloader, model, criterion, 
           optimizer, scheduler, config):
     
-
-    for epoch in range(config["num_epochs"]):
+    train_history, valid_history = [], []
+    for epoch in range(1, config["num_epochs"]+1): # epochs are 1-indexed
         # create batched data loaders
         batched_train_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
                                     for b in train_dataloader)
@@ -98,28 +99,44 @@ def train(train_dataloader, valid_dataloader, model, criterion,
         # initialize timer
         start = time.time()
         # training
-        train_loss = run_train_epoch(batched_train_dataloader, model, criterion, optimizer, 
-                                     scheduler, config["accum_iter"])
+        total_train_loss, epoch_latest_train_loss = run_train_epoch(
+            batched_train_dataloader, 
+            model, criterion, optimizer, scheduler, 
+            config["accum_iter"]
+        )
+        epoch_avg_train_loss = total_train_loss / len(train_dataloader)
         # validation
-        valid_loss = run_valid_epoch(batched_valid_dataloader, model, criterion)
+        total_valid_loss = run_valid_epoch(batched_valid_dataloader, model, 
+                                           criterion)
+        epoch_avg_valid_loss = total_valid_loss / len(valid_dataloader)
+
+        
+        # Accumulate loss history, train loss should be the latest train loss  
+        # since validation is done at end of entire training epoch
+
+        train_history.append(epoch_latest_train_loss.cpu().numpy())
+        valid_history.append(epoch_avg_valid_loss.cpu().numpy())
+
+        # print losses
         print(f"Epoch: {epoch} | "
-              f"Average training loss: {train_loss / len(train_dataloader):.3f} | "
-              f"Average validation loss: {valid_loss / len(valid_dataloader):.3f} | "
+              f"Latest training loss: {epoch_latest_train_loss:.3f} | "
+              f"Average training loss: {epoch_avg_train_loss:.3f} | "
+              f"Average validation loss: {epoch_avg_valid_loss:.3f} | "
               f"Time taken: {1/60*(time.time() - start):.2f} min")
         print("="*80)
 
         # save model
         torch.save(model.state_dict(), f'{config["model_save_name"]}_epoch_{epoch}.pt')
 
-
-
+    # plot and save loss curves
+    plot_losses(train_history, valid_history)
 
 def run_train_epoch(batched_train_dataloader, model, criterion, optimizer, scheduler, 
                     accum_iter):
     # put model in training mode
     model.train()
     # iterate over the training data and compute losses
-    total_loss = 0
+    total_loss, latest_loss = 0, 0
     for i, batch in enumerate(batched_train_dataloader):
         output_probabilities = model.forward(batch.src, batch.tgt, batch.decoder_attn_mask)
         loss, loss_node = criterion(output_probabilities, batch.tgt_y, batch.ntokens)
@@ -128,14 +145,15 @@ def run_train_epoch(batched_train_dataloader, model, criterion, optimizer, sched
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
         total_loss += loss / batch.ntokens
+        latest_loss = loss / batch.ntokens
         scheduler.step()
         
         # print metrics
         if i % 100 == 0:
-            print(f"Step: {i} \t|\t Training loss: {loss/batch.ntokens:.3f} \t|\t"
+            print(f"Batch: {i} \t|\t Training loss: {loss/batch.ntokens:.3f} \t|\t"
                   f"Learning rate: {optimizer.param_groups[0]['lr']:.2e}")
 
-    return total_loss
+    return total_loss, latest_loss
 
 def run_valid_epoch(batched_valid_dataloader, model, criterion):
     # put model in evaluation mode
@@ -148,6 +166,13 @@ def run_valid_epoch(batched_valid_dataloader, model, criterion):
         total_loss += loss / batch.ntokens
     
     return total_loss
+
+def plot_losses(train_history, valid_history):
+    plt.figure(dpi=300)
+    plt.plot(train_history, label="training losses")
+    plt.plot(valid_history, label="validation losses")
+    plt.legend()
+    plt.savefig("artifacts/loss_curves/loss_curve.png")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -182,7 +207,8 @@ if __name__ == "__main__":
                                  betas=(0.9, 0.98), eps=1e-9)
     scheduler = LambdaLR(optimizer = optimizer, 
                             lr_lambda = lambda step_num: get_learning_rate(
-                                step_num+1, config["d_model"], factor=1, warmup=config["warmup"])
+                                step_num+1, config["d_model"], factor=1, 
+                                warmup=config["warmup"])
     )
     
     # train

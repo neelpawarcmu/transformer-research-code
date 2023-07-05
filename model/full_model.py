@@ -7,7 +7,7 @@ class TransformerModel(nn.Module):
     def __init__(self, src_vocab_size, tgt_vocab_size, N=6, d_model=512, d_ff=2048,
                  h=8, dropout_prob=0.1):
         '''
-        This class assembles the transformer model from the submodules created above,
+        This class assembles the transformer model from the individual submodules created,
         block by block as shown in Figure 1 of the paper.
         '''
         super(TransformerModel, self).__init__()
