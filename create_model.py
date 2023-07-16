@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from model.full_model import TransformerModel
 from dataset_utils import load_tokenizers, load_vocab, create_dataloaders, Batch
 import matplotlib.pyplot as plt
+from training_utils import SaveDirs
 
 class LabelSmoothing(nn.Module):
     """
@@ -110,36 +111,37 @@ def train(train_dataloader, valid_dataloader, model, criterion,
                                            criterion)
         epoch_avg_valid_loss = total_valid_loss / len(valid_dataloader)
 
-        
         # Accumulate loss history, train loss should be the latest train loss  
         # since validation is done at end of entire training epoch
-
-        train_history.append(epoch_latest_train_loss.cpu().numpy())
+        train_history.append(epoch_avg_train_loss.cpu().numpy())
         valid_history.append(epoch_avg_valid_loss.cpu().numpy())
 
         # print losses
         print(f"Epoch: {epoch} | "
               f"Latest training loss: {epoch_latest_train_loss:.3f} | "
-              f"Average training loss: {epoch_avg_train_loss:.3f} | "
+              f"Average training loss: {epoch_avg_train_loss:.3f} | \n"
               f"Average validation loss: {epoch_avg_valid_loss:.3f} | "
               f"Time taken: {1/60*(time.time() - start):.2f} min")
         print("="*80)
 
         # save model
-        torch.save(model.state_dict(), f'{config["model_save_name"]}_epoch_{epoch}.pt')
+        torch.save(model.state_dict(), 
+                   f'{config["model_save_name"]}_epoch_{epoch}.pt')
 
     # plot and save loss curves
     plot_losses(train_history, valid_history)
 
-def run_train_epoch(batched_train_dataloader, model, criterion, optimizer, scheduler, 
-                    accum_iter):
+def run_train_epoch(batched_train_dataloader, model, criterion, optimizer, 
+                    scheduler, accum_iter):
     # put model in training mode
     model.train()
     # iterate over the training data and compute losses
     total_loss, latest_loss = 0, 0
     for i, batch in enumerate(batched_train_dataloader):
-        output_probabilities = model.forward(batch.src, batch.tgt, batch.decoder_attn_mask)
-        loss, loss_node = criterion(output_probabilities, batch.tgt_y, batch.ntokens)
+        output_probabilities = model.forward(batch.src, batch.tgt, 
+                                             batch.decoder_attn_mask)
+        loss, loss_node = criterion(output_probabilities, batch.tgt_y, 
+                                    batch.ntokens)
         loss_node.backward()
         if i % accum_iter == 0:
             optimizer.step()
@@ -161,8 +163,10 @@ def run_valid_epoch(batched_valid_dataloader, model, criterion):
     # iterate over the validation data and compute losses
     total_loss = 0
     for i, batch in enumerate(batched_valid_dataloader):
-        output_probabilities = model.forward(batch.src, batch.tgt, batch.decoder_attn_mask)
-        loss, loss_node = criterion(output_probabilities, batch.tgt_y, batch.ntokens)
+        output_probabilities = model.forward(batch.src, batch.tgt, 
+                                             batch.decoder_attn_mask)
+        loss, loss_node = criterion(output_probabilities, batch.tgt_y, 
+                                    batch.ntokens)
         total_loss += loss / batch.ntokens
     
     return total_loss
@@ -180,6 +184,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    # create required directories for saving artifacts
+    SaveDirs.create_train_dirs()
+
     # load vocabulary
     spacy_de, spacy_en = load_tokenizers()
     vocab_src, vocab_tgt = load_vocab(spacy_de, spacy_en)
@@ -195,13 +202,16 @@ if __name__ == "__main__":
     train_dataloader, valid_dataloader = create_dataloaders(device, vocab_src, 
                                                             vocab_tgt, spacy_de, 
                                                             spacy_en, 
-                                                            batch_size=config["batch_size"], 
-                                                            max_padding=config["max_padding"])
+                                                            batch_size=
+                                                            config["batch_size"], 
+                                                            max_padding=
+                                                            config["max_padding"])
 
     # create loss criterion, learning rate optimizer and scheduler
     label_smoothing = LabelSmoothing(config["tgt_vocab_size"], config["pad_idx"], 0.1)
     label_smoothing = label_smoothing.to(device)
     criterion = SimpleLossCompute(label_smoothing)
+    
     # criterion = criterion.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config["base_lr"], 
                                  betas=(0.9, 0.98), eps=1e-9)

@@ -3,9 +3,10 @@ import argparse
 import matplotlib.pyplot as plt
 from dataset_utils import load_tokenizers, load_vocab, create_dataloaders, Batch
 from model.full_model import TransformerModel
+from training_utils import SaveDirs
 
 
-def get_subsequent_mask(size):
+def get_subseq_tokens_mask(size):
     "Mask out subsequent positions."
     attn_shape = (1, size, size)
     subsequent_mask = torch.triu(
@@ -16,7 +17,7 @@ def get_subsequent_mask(size):
 def greedy_decode(model, src, max_len, start_symbol):
     ys = torch.zeros(1, 1).fill_(start_symbol).type_as(src.data)
     for i in range(max_len - 1):
-        decoder_attn_mask = get_subsequent_mask(ys.size(1)).type_as(src.data)
+        decoder_attn_mask = get_subseq_tokens_mask(ys.size(1)).type_as(src.data)
         prob = model(
             src, ys, decoder_attn_mask
         )[:, -1]
@@ -80,7 +81,8 @@ def check_outputs(
         results[idx] = (rb, src_tokens, tgt_tokens, model_out, model_txt)
     return results, print_text
 
-def run_model_example(vocab_src, vocab_tgt, spacy_de, spacy_en, model_path, output_path, n_examples=5):
+def run_model_example(vocab_src, vocab_tgt, spacy_de, spacy_en, model_path, 
+                      output_path, n_examples=5):
 
     print("Preparing Data ...")
     _, valid_dataloader = create_dataloaders(torch.device("cpu"), vocab_src, 
@@ -93,7 +95,7 @@ def run_model_example(vocab_src, vocab_tgt, spacy_de, spacy_en, model_path, outp
         torch.load(model_path, map_location=torch.device("cpu"))
     )
 
-    print("Checking Model Outputs:")
+    print("Checking Model Outputs ...")
     example_data, print_text = check_outputs(
         valid_dataloader, model, vocab_src, vocab_tgt, n_examples, 
         model_path
@@ -113,12 +115,15 @@ def save_translations(print_text, save_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_epoch", type=int, default=1) # 1-indexed epoch number of saved model
+    parser.add_argument("--model_epoch", type=int, default=1
+                        ) # 1-indexed epoch number of saved model
     parser.add_argument("--model_save_name", type=str, 
                         default="artifacts/saved_models/multi30k_model")
     parser.add_argument("--output_save_name", type=str, 
                         default="artifacts/generated_translations/translation")
     args = parser.parse_args()
+
+    # get save path names
     model_path = f"{args.model_save_name}_epoch_{args.model_epoch}.pt"
     output_path = f"{args.output_save_name}_epoch_{args.model_epoch}.png"
 
@@ -126,4 +131,8 @@ if __name__ == "__main__":
     spacy_de, spacy_en = load_tokenizers()
     vocab_src, vocab_tgt = load_vocab(spacy_de, spacy_en)
 
-    run_model_example(vocab_src, vocab_tgt, spacy_de, spacy_en, model_path, output_path)
+    # create directory for saving translation results
+    SaveDirs.add_dir("generated_translations")
+
+    run_model_example(vocab_src, vocab_tgt, spacy_de, spacy_en, model_path, 
+                      output_path)

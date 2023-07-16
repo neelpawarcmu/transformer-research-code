@@ -10,13 +10,14 @@ from torch.nn.functional import pad
 
 # "Batching"
 
-def get_subsequent_mask(size):
-    "Mask out subsequent positions."
-    attn_shape = (1, size, size)
-    subsequent_mask = torch.triu(
-        torch.ones(attn_shape), diagonal=1
-        ).type(torch.uint8)
-    return subsequent_mask == 0
+def get_subseq_tokens_mask(tgt):
+    """
+    Generate an upper triangular matrix to mask out subsequent positions
+    """
+    mask_shape = (1, tgt.size(-1), tgt.size(-1))
+    upper_tri_matrix = torch.triu(torch.ones(mask_shape), diagonal=1)
+    subseq_tokens_mask = (upper_tri_matrix == 0).type_as(tgt)
+    return subseq_tokens_mask
 
 class Batch:
     """Object for holding a batch of data with mask during training."""
@@ -32,10 +33,9 @@ class Batch:
     @staticmethod
     def make_decoder_attn_mask(tgt, pad_idx):
         "Create a mask to hide padding and future words."
-        decoder_attn_mask = (tgt != pad_idx).unsqueeze(-2)
-        decoder_attn_mask = decoder_attn_mask & get_subsequent_mask(tgt.size(-1)).type_as(
-            decoder_attn_mask.data
-        )
+        pad_mask = (tgt != pad_idx).unsqueeze(-2)
+        subseq_tokens_mask = get_subseq_tokens_mask(tgt)
+        decoder_attn_mask = pad_mask & subseq_tokens_mask
         return decoder_attn_mask
 
 # "Load vocab and tokenizers"
@@ -97,17 +97,17 @@ def load_vocab(spacy_de, spacy_en):
         torch.save((vocab_src, vocab_tgt), "artifacts/saved_vocab/vocab.pt")
     else:
         vocab_src, vocab_tgt = torch.load("artifacts/saved_vocab/vocab.pt")
-    print("Finished.\nVocabulary sizes:")
-    print(len(vocab_src))
-    print(len(vocab_tgt))
+    print(f"Finished loading vocabulary.")
+    print(f"German vocabulary size: {len(vocab_src)}")
+    print(f"English vocabulary size: {len(vocab_tgt)}")
     return vocab_src, vocab_tgt
 
 # "Iterators"
 
 def collate_batch(
     batch,
-    src_pipeline,
-    tgt_pipeline,
+    tokenize_de,
+    tokenize_en,
     src_vocab,
     tgt_vocab,
     device,
@@ -122,7 +122,7 @@ def collate_batch(
             [
                 bs_id,
                 torch.tensor(
-                    src_vocab(src_pipeline(_src)),
+                    src_vocab(tokenize_de(_src)),
                     dtype=torch.int64,
                     device=device,
                 ),
@@ -134,7 +134,7 @@ def collate_batch(
             [
                 bs_id,
                 torch.tensor(
-                    tgt_vocab(tgt_pipeline(_tgt)),
+                    tgt_vocab(tokenize_en(_tgt)),
                     dtype=torch.int64,
                     device=device,
                 ),
@@ -166,7 +166,8 @@ def collate_batch(
     return (src, tgt)
 
 def create_dataloaders(device, vocab_src, vocab_tgt, spacy_de, 
-                       spacy_en, shuffle=True, batch_size=12000, max_padding=128):
+                       spacy_en, shuffle=True, batch_size=12000, 
+                       max_padding=128):
     def tokenize_de(text):
         return tokenize(text, spacy_de)
 
@@ -189,17 +190,17 @@ def create_dataloaders(device, vocab_src, vocab_tgt, spacy_de,
         language_pair=("de", "en")
     )
 
-    train_iter_map = to_map_style_dataset(train_iter)
-    valid_iter_map = to_map_style_dataset(valid_iter)
+    train_map = to_map_style_dataset(train_iter)
+    valid_map = to_map_style_dataset(valid_iter)
 
     train_dataloader = DataLoader(
-        train_iter_map,
+        train_map,
         batch_size=batch_size,
         shuffle=shuffle,
         collate_fn=collate_fn,
     )
     valid_dataloader = DataLoader(
-        valid_iter_map,
+        valid_map,
         batch_size=batch_size,
         shuffle=shuffle,
         collate_fn=collate_fn,
