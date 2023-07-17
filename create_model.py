@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from model.full_model import TransformerModel
 from dataset_utils import load_tokenizers, load_vocab, create_dataloaders, Batch
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 from training_utils import SaveDirs
 
 class LabelSmoothing(nn.Module):
@@ -175,6 +176,9 @@ def plot_losses(train_history, valid_history):
     plt.figure(dpi=300)
     plt.plot(train_history, label="training losses")
     plt.plot(valid_history, label="validation losses")
+    plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
     plt.legend()
     plt.savefig("artifacts/loss_curves/loss_curve.png")
 
