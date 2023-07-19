@@ -124,8 +124,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # get save path names
-    model_path = f"{args.model_save_name}_epoch_{args.model_epoch}.pt"
-    output_path = f"{args.output_save_name}_epoch_{args.model_epoch}.png"
+    model_path = f"{args.model_save_name}_epoch_{args.model_epoch:02d}.pt"
+    output_path = f"{args.output_save_name}_epoch_{args.model_epoch:02d}.png"
 
     # load vocabulary
     spacy_de, spacy_en = load_tokenizers()
