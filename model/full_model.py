@@ -171,7 +171,7 @@ class Sublayer(nn.Module):
     Sublayer accepts a workhorse (either a closure with a self attention
     layer inside, or a position-wise feed forward layer)
     as an argument and composes it with the following operations:
-    LayerNorm(x + Dropout(Workhorse(x)))
+    x + Dropout(Workhorse(LayerNorm(x)))
     """
     def __init__(self, workhorse, size, dropout_prob):
         super(Sublayer, self).__init__()
