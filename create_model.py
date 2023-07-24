@@ -4,10 +4,13 @@ import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import LambdaLR
 from model.full_model import TransformerModel
-from dataset_utils import load_tokenizers, load_vocab, create_dataloaders, Batch
+from dataset_utils import create_dataloaders, Batch
+from data_utils.vocab_utils import build_tokenizers, build_vocabularies
+from data_utils.dataloader_utils import CustomDataset
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from training_utils import SaveDirs
+import torchtext.datasets as datasets
 
 class LabelSmoothing(nn.Module):
     """
@@ -24,7 +27,7 @@ class LabelSmoothing(nn.Module):
 
     def forward(self, x, target):
         assert x.size(1) == self.vocab_size
-        true_dist = x.data.clone()
+        true_dist = x.data.clone() # TODO: init with zeros
         true_dist.fill_(self.smoothing / (self.vocab_size - 2))
         true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
         true_dist[:, self.pad_idx] = 0
@@ -46,7 +49,7 @@ class SimpleLossCompute:
                 y_preds.contiguous().view(-1, y_preds.size(-1)), 
                 y_labels.contiguous().view(-1)
             ) / batch_size
-        return sloss.data * batch_size, sloss
+        return sloss.data * batch_size, sloss # TODO refactor
 
 def create_model(src_vocab_size: int,
                  tgt_vocab_size: int,
@@ -142,7 +145,7 @@ def run_train_epoch(batched_train_dataloader, model, criterion, optimizer,
         output_probabilities = model.forward(batch.src, batch.tgt, 
                                              batch.decoder_attn_mask)
         loss, loss_node = criterion(output_probabilities, batch.tgt_y, 
-                                    batch.ntokens)
+                                    batch.ntokens) # TODO: refactor to single loss
         loss_node.backward()
         if i % accum_iter == 0:
             optimizer.step()
@@ -174,9 +177,10 @@ def run_valid_epoch(batched_valid_dataloader, model, criterion):
 
 def plot_losses(train_history, valid_history):
     plt.figure(dpi=300)
-    plt.plot(train_history, label="training losses")
-    plt.plot(valid_history, label="validation losses")
+    plt.plot(train_history, label="training loss")
+    plt.plot(valid_history, label="validation loss")
     plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
+    plt.grid(visible=True)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
@@ -191,25 +195,30 @@ if __name__ == "__main__":
     # create required directories for saving artifacts
     SaveDirs.create_train_dirs()
 
-    # load vocabulary
-    spacy_de, spacy_en = load_tokenizers()
-    vocab_src, vocab_tgt = load_vocab(spacy_de, spacy_en)
+    # load tokenizers and vocabulary
+    tokenizer_src, tokenizer_tgt = build_tokenizers()
+    vocab_src, vocab_tgt = build_vocabularies(tokenizer_src, tokenizer_tgt)
 
     # create configuration for model and training
-    config = create_config(vocab_src, vocab_tgt, args)
+    config = create_config(vocab_src.vocab, vocab_tgt.vocab, args)
+
+    train, valid, test = datasets.Multi30k(language_pair=("de", "en"))
+    CustomDataset(train+valid+test, tokenizer_src, tokenizer_tgt, vocab_src.vocab, vocab_tgt.vocab, config["max_padding"], device)
     
     # initialize model
     model = create_model(config["src_vocab_size"], config["tgt_vocab_size"])
     model = model.to(device)
     
     # load data
-    train_dataloader, valid_dataloader = create_dataloaders(device, vocab_src, 
-                                                            vocab_tgt, spacy_de, 
-                                                            spacy_en, 
-                                                            batch_size=
-                                                            config["batch_size"], 
-                                                            max_padding=
-                                                            config["max_padding"])
+    train_dataloader, valid_dataloader = create_dataloaders(
+        device, 
+        vocab_src.vocab, 
+        vocab_tgt.vocab, 
+        tokenizer_src.spacy_model, 
+        tokenizer_tgt.spacy_model, 
+        batch_size=config["batch_size"], 
+        max_padding=config["max_padding"]
+    )
 
     # create loss criterion, learning rate optimizer and scheduler
     label_smoothing = LabelSmoothing(config["tgt_vocab_size"], config["pad_idx"], 0.1)

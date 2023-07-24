@@ -9,18 +9,14 @@ from training_utils import SaveDirs
 def get_subseq_tokens_mask(size):
     "Mask out subsequent positions."
     attn_shape = (1, size, size)
-    subsequent_mask = torch.triu(
-        torch.ones(attn_shape), diagonal=1
-        ).type(torch.uint8)
+    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1)
     return subsequent_mask == 0
 
 def greedy_decode(model, src, max_len, start_symbol):
     ys = torch.zeros(1, 1).fill_(start_symbol).type_as(src.data)
     for i in range(max_len - 1):
         decoder_attn_mask = get_subseq_tokens_mask(ys.size(1)).type_as(src.data)
-        prob = model(
-            src, ys, decoder_attn_mask
-        )[:, -1]
+        prob = model(src, ys, decoder_attn_mask)[:, -1]
         _, next_word = torch.max(prob, dim=1)
         next_word = next_word.data[0]
         ys = torch.cat(
