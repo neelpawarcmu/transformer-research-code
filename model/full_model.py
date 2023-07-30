@@ -9,6 +9,12 @@ class TransformerModel(nn.Module):
         '''
         This class assembles the transformer model from the individual submodules created,
         block by block as shown in Figure 1 of the paper.
+           src_vocab_size: number of tokens in encoder's embedding dictionary
+           tgt_vocab_size: number of tokens in decoder's embedding dictionary
+           N: number of encoder/decoder layers
+           d_model: embedding size
+           d_ff: feedfirward layer size
+           h: number of attention heads
         '''
         super(TransformerModel, self).__init__()
 
