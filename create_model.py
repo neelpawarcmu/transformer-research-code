@@ -2,54 +2,19 @@ import argparse
 import time
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import LambdaLR
-from model.full_model import TransformerModel
-from dataset_utils import create_dataloaders, Batch
-from data_utils.vocab_utils import build_tokenizers, build_vocabularies
-from data_utils.dataloader_utils import CustomDataset
+from torch.utils.data import DataLoader
+import torchtext.datasets as datasets
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-from training_utils import SaveDirs
-import torchtext.datasets as datasets
+from torch.optim.lr_scheduler import LambdaLR
+from model.full_model import TransformerModel
+from old_dataset_utils import Batch
+from data_utils.vocab_utils import build_tokenizers, build_vocabularies
+from data_utils.dataset_utils import load_datasets
+from path_utils import SaveDirs
+from training_utils.loss_utils import SimpleLossCompute, LabelSmoothing
 
-class LabelSmoothing(nn.Module):
-    """
-    Implement label smoothing. TODO: improve this docstring
-    """
-    def __init__(self, vocab_size, pad_idx, smoothing=0.0):
-        super(LabelSmoothing, self).__init__()
-        self.criterion = nn.KLDivLoss(reduction="sum")
-        self.pad_idx = pad_idx
-        self.confidence = 1.0 - smoothing
-        self.smoothing = smoothing
-        self.vocab_size = vocab_size
-        self.true_dist = None
-
-    def forward(self, x, target):
-        assert x.size(1) == self.vocab_size
-        true_dist = x.data.clone() # TODO: init with zeros
-        true_dist.fill_(self.smoothing / (self.vocab_size - 2))
-        true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
-        true_dist[:, self.pad_idx] = 0
-        mask = torch.nonzero(target.data == self.pad_idx)
-        if mask.dim() > 0:
-            true_dist.index_fill_(0, mask.squeeze(), 0.0)
-        self.true_dist = true_dist
-        return self.criterion(x, true_dist.clone().detach())
-
-class SimpleLossCompute:
-    """
-    A simple loss compute and train function.
-    """
-    def __init__(self, criterion):
-        self.criterion = criterion
-
-    def __call__(self, y_preds, y_labels, batch_size):
-        sloss = self.criterion(
-                y_preds.contiguous().view(-1, y_preds.size(-1)), 
-                y_labels.contiguous().view(-1)
-            ) / batch_size
-        return sloss.data * batch_size, sloss # TODO refactor
+from torchtext.data.functional import to_map_style_dataset #TODO: remove
 
 def create_model(src_vocab_size: int,
                  tgt_vocab_size: int,
@@ -91,16 +56,16 @@ def get_learning_rate(step_num, d_model, factor, warmup):
         d_model ** (-0.5) * min(step_num ** (-0.5), step_num * warmup ** (-1.5))
     )
 
-def train(train_dataloader, valid_dataloader, model, criterion, 
+def train(train_dataloader, val_dataloader, model, criterion, 
           optimizer, scheduler, config):
     
-    train_history, valid_history = [], []
+    train_history, val_history = [], []
     for epoch in range(1, config["num_epochs"]+1): # epochs are 1-indexed
         # create batched data loaders
         batched_train_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
                                     for b in train_dataloader)
-        batched_valid_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
-                                    for b in valid_dataloader)
+        batched_val_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
+                                    for b in val_dataloader)
         # initialize timer
         start = time.time()
         # training
@@ -111,20 +76,20 @@ def train(train_dataloader, valid_dataloader, model, criterion,
         )
         epoch_avg_train_loss = total_train_loss / len(train_dataloader)
         # validation
-        total_valid_loss = run_valid_epoch(batched_valid_dataloader, model, 
+        total_val_loss = run_val_epoch(batched_val_dataloader, model, 
                                            criterion)
-        epoch_avg_valid_loss = total_valid_loss / len(valid_dataloader)
+        epoch_avg_val_loss = total_val_loss / len(val_dataloader)
 
         # Accumulate loss history, train loss should be the latest train loss  
         # since validation is done at end of entire training epoch
         train_history.append(epoch_avg_train_loss.cpu().numpy())
-        valid_history.append(epoch_avg_valid_loss.cpu().numpy())
+        val_history.append(epoch_avg_val_loss.cpu().numpy())
 
         # print losses
         print(f"Epoch: {epoch} | "
               f"Latest training loss: {epoch_latest_train_loss:.3f} | "
               f"Average training loss: {epoch_avg_train_loss:.3f} | \n"
-              f"Average validation loss: {epoch_avg_valid_loss:.3f} | "
+              f"Average validation loss: {epoch_avg_val_loss:.3f} | "
               f"Time taken: {1/60*(time.time() - start):.2f} min")
         print("="*80)
 
@@ -133,7 +98,7 @@ def train(train_dataloader, valid_dataloader, model, criterion,
                    f'{config["model_save_name"]}_epoch_{epoch}.pt')
 
     # plot and save loss curves
-    plot_losses(train_history, valid_history)
+    plot_losses(train_history, val_history)
 
 def run_train_epoch(batched_train_dataloader, model, criterion, optimizer, 
                     scheduler, accum_iter):
@@ -142,43 +107,45 @@ def run_train_epoch(batched_train_dataloader, model, criterion, optimizer,
     # iterate over the training data and compute losses
     total_loss, latest_loss = 0, 0
     for i, batch in enumerate(batched_train_dataloader):
-        output_probabilities = model.forward(batch.src, batch.tgt, 
+        output_probabilities = model.forward(batch.src, 
+                                             batch.tgt_shifted_right,
                                              batch.decoder_attn_mask)
-        loss, loss_node = criterion(output_probabilities, batch.tgt_y, 
-                                    batch.ntokens) # TODO: refactor to single loss
-        loss_node.backward()
+        loss = criterion(output_probabilities, batch.tgt_label, batch.ntokens)
+        loss.backward()
         if i % accum_iter == 0:
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
-        total_loss += loss / batch.ntokens
-        latest_loss = loss / batch.ntokens
+        latest_loss = loss.data
+        total_loss += latest_loss
         scheduler.step()
         
         # print metrics
         if i % 100 == 0:
-            print(f"Batch: {i} \t|\t Training loss: {loss/batch.ntokens:.3f} \t|\t"
+            print(f"Batch: {i} \t|\t Training loss: {latest_loss:.3f} \t|\t"
                   f"Learning rate: {optimizer.param_groups[0]['lr']:.2e}")
 
     return total_loss, latest_loss
 
-def run_valid_epoch(batched_valid_dataloader, model, criterion):
+def run_val_epoch(batched_val_dataloader, model, criterion):
     # put model in evaluation mode
     model.eval()
     # iterate over the validation data and compute losses
     total_loss = 0
-    for i, batch in enumerate(batched_valid_dataloader):
-        output_probabilities = model.forward(batch.src, batch.tgt, 
+    for i, batch in enumerate(batched_val_dataloader):
+        output_probabilities = model.forward(batch.src, batch.tgt_shifted_right, 
                                              batch.decoder_attn_mask)
-        loss, loss_node = criterion(output_probabilities, batch.tgt_y, 
-                                    batch.ntokens)
-        total_loss += loss / batch.ntokens
+        loss = criterion(output_probabilities, 
+                              batch.tgt_label, 
+                              batch.ntokens)
+        loss.backward()
+        total_loss += loss.data
     
     return total_loss
 
-def plot_losses(train_history, valid_history):
+def plot_losses(train_history, val_history):
     plt.figure(dpi=300)
     plt.plot(train_history, label="training loss")
-    plt.plot(valid_history, label="validation loss")
+    plt.plot(val_history, label="validation loss")
     plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
     plt.grid(visible=True)
     plt.xlabel("Epoch")
@@ -202,24 +169,31 @@ if __name__ == "__main__":
     # create configuration for model and training
     config = create_config(vocab_src.vocab, vocab_tgt.vocab, args)
 
-    train, valid, test = datasets.Multi30k(language_pair=("de", "en"))
-    CustomDataset(train+valid+test, tokenizer_src, tokenizer_tgt, vocab_src.vocab, vocab_tgt.vocab, config["max_padding"], device)
-    
     # initialize model
     model = create_model(config["src_vocab_size"], config["tgt_vocab_size"])
     model = model.to(device)
     
     # load data
-    train_dataloader, valid_dataloader = create_dataloaders(
-        device, 
-        vocab_src.vocab, 
+    train_dataset, val_dataset, test_dataset = load_datasets(
+        tokenizer_src, 
+        tokenizer_tgt, 
+        vocab_src.vocab,
         vocab_tgt.vocab, 
-        tokenizer_src.spacy_model, 
-        tokenizer_tgt.spacy_model, 
-        batch_size=config["batch_size"], 
-        max_padding=config["max_padding"]
+        config,
+        device,
+        preprocess=True
     )
 
+    train_dataloader = DataLoader(dataset=train_dataset, 
+                                  batch_size=config["batch_size"], 
+                                  shuffle=True,
+                                  collate_fn=train_dataset.collate_fn)
+    
+    val_dataloader = DataLoader(dataset=val_dataset, 
+                                batch_size=config["batch_size"], 
+                                shuffle=True,
+                                collate_fn=val_dataset.collate_fn)
+    
     # create loss criterion, learning rate optimizer and scheduler
     label_smoothing = LabelSmoothing(config["tgt_vocab_size"], config["pad_idx"], 0.1)
     label_smoothing = label_smoothing.to(device)
@@ -235,5 +209,4 @@ if __name__ == "__main__":
     )
     
     # train
-    train(train_dataloader, valid_dataloader, model, criterion, optimizer,
-          scheduler, config)
+    train(train_dataloader, val_dataloader, model, criterion, optimizer, scheduler, config)

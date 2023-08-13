@@ -340,9 +340,10 @@ class MultiHeadedAttention(nn.Module):
 
         # TODO: comment here what we are doing, explain reshaping operations
         # reshape outputs to @@@ shape (TODO)
-        derived_queries = self.w_q(query).view(batch_size, -1, self.h, self.d_k).transpose(1, 2) # TODO: reshape better?
-        derived_keys = self.w_k(key).view(batch_size, -1, self.h, self.d_k).transpose(1, 2)
-        derived_values = self.w_v(value).view(batch_size, -1, self.h, self.d_k).transpose(1, 2)
+        reshape_fn = lambda x : x.view(batch_size, -1, self.h, self.d_k).transpose(1, 2)
+        derived_queries = reshape_fn(self.w_q(query))
+        derived_keys = reshape_fn(self.w_k(key))
+        derived_values = reshape_fn(self.w_v(value))
 
         # compute attention
         attention_outputs, attention_weightings = \
@@ -391,9 +392,9 @@ class LinearSoftmaxLayer(nn.Module):
     2. generating probabilities
     """
 
-    def __init__(self, d_model, vocab):
+    def __init__(self, d_model, vocab_size):
         super(LinearSoftmaxLayer, self).__init__()
-        self.proj = nn.Linear(d_model, vocab)
+        self.proj = nn.Linear(d_model, vocab_size)
 
     def forward(self, x):
         return log_softmax(self.proj(x), dim=-1)

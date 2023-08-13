@@ -1,9 +1,11 @@
 import torch
 import argparse
 import matplotlib.pyplot as plt
-from dataset_utils import load_tokenizers, load_vocab, create_dataloaders, Batch
+from old_dataset_utils import create_dataloaders, Batch
+from data_utils.vocab_utils import build_tokenizers, build_vocabularies
+from data_utils.dataset_utils import load_datasets
 from model.full_model import TransformerModel
-from training_utils import SaveDirs
+from path_utils import SaveDirs
 
 
 def get_subseq_tokens_mask(size):
@@ -13,6 +15,7 @@ def get_subseq_tokens_mask(size):
     return subsequent_mask == 0
 
 def greedy_decode(model, src, max_len, start_symbol):
+    import pdb; pdb.set_trace()
     ys = torch.zeros(1, 1).fill_(start_symbol).type_as(src.data)
     for i in range(max_len - 1):
         decoder_attn_mask = get_subseq_tokens_mask(ys.size(1)).type_as(src.data)
@@ -42,13 +45,12 @@ def check_outputs(
 
     for idx, batch in list(enumerate(valid_dataloader))[:n_examples]:
         rb = Batch(batch[0], batch[1], pad_idx)
-        greedy_decode(model, rb.src, 64, 0)[0]
 
         src_tokens = [
             vocab_src.get_itos()[x] for x in rb.src[0] if x != pad_idx
         ]
         tgt_tokens = [
-            vocab_tgt.get_itos()[x] for x in rb.tgt[0] if x != pad_idx
+            vocab_tgt.get_itos()[x] for x in rb.tgt_shifted_right[0] if x != pad_idx
         ]
 
         model_out = greedy_decode(model, rb.src, 72, 0)[0]
@@ -77,12 +79,12 @@ def check_outputs(
         results[idx] = (rb, src_tokens, tgt_tokens, model_out, model_txt)
     return results, print_text
 
-def run_model_example(vocab_src, vocab_tgt, spacy_de, spacy_en, model_path, 
+def run_model_example(vocab_src, vocab_tgt, tokenizer_src, tokenizer_tgt, model_path, 
                       output_path, n_examples=5):
 
     print("Preparing Data ...")
     _, valid_dataloader = create_dataloaders(torch.device("cpu"), vocab_src, 
-                                             vocab_tgt, spacy_de, spacy_en, 
+                                             vocab_tgt, tokenizer_src, tokenizer_tgt, 
                                              batch_size=1, shuffle=False)
 
     print("Loading Trained Model ...")
@@ -124,11 +126,12 @@ if __name__ == "__main__":
     output_path = f"{args.output_save_name}_epoch_{args.model_epoch}.png"
 
     # load vocabulary
-    spacy_de, spacy_en = load_tokenizers()
-    vocab_src, vocab_tgt = load_vocab(spacy_de, spacy_en)
+    tokenizer_src, tokenizer_tgt = build_tokenizers()
+    vocab_src, vocab_tgt = build_vocabularies(tokenizer_src, tokenizer_tgt)
 
     # create directory for saving translation results
     SaveDirs.add_dir("generated_translations")
 
-    run_model_example(vocab_src, vocab_tgt, spacy_de, spacy_en, model_path, 
-                      output_path)
+    run_model_example(vocab_src.vocab, vocab_tgt.vocab, 
+                      tokenizer_src.spacy_model, tokenizer_tgt.spacy_model, 
+                      model_path, output_path)
