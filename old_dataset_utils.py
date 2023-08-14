@@ -7,6 +7,7 @@ import torchtext.datasets as datasets
 from torchtext.data.functional import to_map_style_dataset
 from torch.utils.data import DataLoader
 from torch.nn.functional import pad
+from visualizations.viz import visualize_attn_mask
 
 # "Batching"
 class Batch:
@@ -26,8 +27,12 @@ class Batch:
     def make_decoder_attn_mask(tgt, pad_idx):
         "Create a mask to hide padding and future words."
         pad_mask = (tgt != pad_idx).unsqueeze(-2)
+        pad_mask_T = pad_mask.transpose(1,2)
         subseq_tokens_mask = Batch.get_subseq_tokens_mask(tgt)
-        decoder_attn_mask = pad_mask & subseq_tokens_mask
+        decoder_attn_mask = pad_mask & subseq_tokens_mask & pad_mask_T
+        # TODO remove
+        # visualize_attn_mask(decoder_attn_mask)
+        # import pdb; pdb.set_trace()
         return decoder_attn_mask
     
     @staticmethod

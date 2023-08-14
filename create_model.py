@@ -14,8 +14,6 @@ from data_utils.dataset_utils import load_datasets
 from path_utils import SaveDirs
 from training_utils.loss_utils import SimpleLossCompute, LabelSmoothing
 
-from torchtext.data.functional import to_map_style_dataset #TODO: remove
-
 def create_model(src_vocab_size: int,
                  tgt_vocab_size: int,
                  N: int = 6, 
@@ -107,6 +105,7 @@ def run_train_epoch(batched_train_dataloader, model, criterion, optimizer,
     # iterate over the training data and compute losses
     total_loss, latest_loss = 0, 0
     for i, batch in enumerate(batched_train_dataloader):
+        # import pdb; pdb.set_trace()
         output_probabilities = model.forward(batch.src, 
                                              batch.tgt_shifted_right,
                                              batch.decoder_attn_mask)

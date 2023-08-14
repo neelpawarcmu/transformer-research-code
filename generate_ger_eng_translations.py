@@ -15,7 +15,6 @@ def get_subseq_tokens_mask(size):
     return subsequent_mask == 0
 
 def greedy_decode(model, src, max_len, start_symbol):
-    import pdb; pdb.set_trace()
     ys = torch.zeros(1, 1).fill_(start_symbol).type_as(src.data)
     for i in range(max_len - 1):
         decoder_attn_mask = get_subseq_tokens_mask(ys.size(1)).type_as(src.data)

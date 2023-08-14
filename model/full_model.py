@@ -291,21 +291,6 @@ class DecoderLayer(nn.Module):
 
         return pos_ff_sublayer_output
 
-
-def attention_fn(derived_queries, derived_keys, derived_values, mask=None, dropout=None):
-    "Compute 'Scaled Dot Product Attention'"
-    # key size
-    d_k = derived_queries.size(-1)
-    # equation (1) of paper
-    scores = torch.matmul(derived_queries, derived_keys.transpose(-2, -1)) / math.sqrt(d_k)
-    if mask is not None:
-        scores = scores.masked_fill(mask == 0, -1e9)
-    attention_weightings = scores.softmax(dim=-1)
-    if dropout is not None:
-        attention_weightings = dropout(attention_weightings)
-    return torch.matmul(attention_weightings, derived_values), attention_weightings
-
-
 class MultiHeadedAttention(nn.Module):
     """
     Generates a multiheaded attention network, which is 3 feedforward networks,
@@ -347,8 +332,8 @@ class MultiHeadedAttention(nn.Module):
 
         # compute attention
         attention_outputs, attention_weightings = \
-            attention_fn(derived_queries, derived_keys, derived_values,
-                         attention_mask_tensor, dropout=self.dropout_layer)
+            self.attention_fn(derived_queries, derived_keys, derived_values,
+                              attention_mask_tensor, dropout=self.dropout_layer)
         # save weightings for visualization
         self.attention_weightings = attention_weightings
         # reshape attention outputs to @@@ (TODO)
@@ -358,6 +343,20 @@ class MultiHeadedAttention(nn.Module):
         del query, key, value, derived_queries, derived_keys, derived_values
 
         return result
+    
+    @staticmethod
+    def attention_fn(derived_queries, derived_keys, derived_values, mask=None, dropout=None):
+        "Compute 'Scaled Dot Product Attention'"
+        # key size
+        d_k = derived_queries.size(-1)
+        # equation (1) of paper
+        scores = torch.matmul(derived_queries, derived_keys.transpose(-2, -1)) / math.sqrt(d_k)
+        if mask is not None:
+            scores = scores.masked_fill(mask == 0, -1e9)
+        attention_weightings = scores.softmax(dim=-1)
+        if dropout is not None:
+            attention_weightings = dropout(attention_weightings)
+        return torch.matmul(attention_weightings, derived_values), attention_weightings
 
 
 class PositionwiseFeedForward(nn.Module):
