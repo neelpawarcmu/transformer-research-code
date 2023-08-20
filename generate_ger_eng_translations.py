@@ -15,16 +15,18 @@ def get_subseq_tokens_mask(size):
     return subsequent_mask == 0
 
 def greedy_decode(model, src, max_len, start_symbol):
-    import pdb; pdb.set_trace()
     ys = torch.zeros(1, 1).fill_(start_symbol).type_as(src.data)
     for i in range(max_len - 1):
         decoder_attn_mask = get_subseq_tokens_mask(ys.size(1)).type_as(src.data)
-        prob = model(src, ys, decoder_attn_mask)[:, -1]
+        model_output = model(src, ys, decoder_attn_mask)
+        prob = model_output[:, -1]
         _, next_word = torch.max(prob, dim=1)
         next_word = next_word.data[0]
         ys = torch.cat(
             [ys, torch.zeros(1, 1).type_as(src.data).fill_(next_word)], dim=1
         )
+        import pdb; pdb.set_trace()
+
     return ys
 
 def check_outputs(
@@ -122,8 +124,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # get save path names
-    model_path = f"{args.model_save_name}_epoch_{args.model_epoch}.pt"
-    output_path = f"{args.output_save_name}_epoch_{args.model_epoch}.png"
+    model_path = f"{args.model_save_name}_epoch_{args.model_epoch:02d}.pt"
+    output_path = f"{args.output_save_name}_epoch_{args.model_epoch:02d}.png"
 
     # load vocabulary
     tokenizer_src, tokenizer_tgt = build_tokenizers()
@@ -132,6 +134,5 @@ if __name__ == "__main__":
     # create directory for saving translation results
     SaveDirs.add_dir("generated_translations")
 
-    run_model_example(vocab_src.vocab, vocab_tgt.vocab, 
-                      tokenizer_src.spacy_model, tokenizer_tgt.spacy_model, 
-                      model_path, output_path)
+    run_model_example(vocab_src, vocab_tgt, spacy_de, spacy_en, model_path, 
+                      output_path)

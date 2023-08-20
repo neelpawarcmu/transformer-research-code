@@ -1,3 +1,7 @@
-artifacts/
-__pycache__/
+artifacts
+__pycache__
 *.pt
+*.pyc
+*py~
+*/*.pyc
+temp.*

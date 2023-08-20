@@ -1,0 +1,264 @@
+--------------------------------------------------------------------------------
+German vocabulary size: 8315
+English vocabulary size: 6384
+--------------------------------------------------------------------------------
+Batch: 0 	|	 Training loss: 7.520 	|	Learning rate: 5.38e-07
+Batch: 100 	|	 Training loss: 6.856 	|	Learning rate: 2.74e-05
+Batch: 200 	|	 Training loss: 6.275 	|	Learning rate: 5.43e-05
+Batch: 300 	|	 Training loss: 5.912 	|	Learning rate: 8.12e-05
+Batch: 400 	|	 Training loss: 5.312 	|	Learning rate: 1.08e-04
+Batch: 500 	|	 Training loss: 4.902 	|	Learning rate: 1.35e-04
+Batch: 600 	|	 Training loss: 4.390 	|	Learning rate: 1.62e-04
+Batch: 700 	|	 Training loss: 4.457 	|	Learning rate: 1.89e-04
+Batch: 800 	|	 Training loss: 4.058 	|	Learning rate: 2.16e-04
+Batch: 900 	|	 Training loss: 3.946 	|	Learning rate: 2.43e-04
+Epoch: 1 | Latest training loss: 3.712 | Average training loss: 5.299 | 
+Average validation loss: 3.916 | Time taken: 2.53 min
+================================================================================
+Batch: 0 	|	 Training loss: 4.097 	|	Learning rate: 2.44e-04
+Batch: 100 	|	 Training loss: 3.892 	|	Learning rate: 2.71e-04
+Batch: 200 	|	 Training loss: 3.814 	|	Learning rate: 2.98e-04
+Batch: 300 	|	 Training loss: 3.296 	|	Learning rate: 3.25e-04
+Batch: 400 	|	 Training loss: 3.503 	|	Learning rate: 3.52e-04
+Batch: 500 	|	 Training loss: 3.256 	|	Learning rate: 3.79e-04
+Batch: 600 	|	 Training loss: 3.057 	|	Learning rate: 4.06e-04
+Batch: 700 	|	 Training loss: 3.323 	|	Learning rate: 4.33e-04
+Batch: 800 	|	 Training loss: 3.111 	|	Learning rate: 4.60e-04
+Batch: 900 	|	 Training loss: 3.110 	|	Learning rate: 4.87e-04
+Epoch: 2 | Latest training loss: 3.355 | Average training loss: 3.428 | 
+Average validation loss: 3.015 | Time taken: 2.58 min
+================================================================================
+Batch: 0 	|	 Training loss: 3.091 	|	Learning rate: 4.88e-04
+Batch: 100 	|	 Training loss: 2.975 	|	Learning rate: 5.15e-04
+Batch: 200 	|	 Training loss: 2.930 	|	Learning rate: 5.42e-04
+Batch: 300 	|	 Training loss: 2.715 	|	Learning rate: 5.69e-04
+Batch: 400 	|	 Training loss: 2.836 	|	Learning rate: 5.96e-04
+Batch: 500 	|	 Training loss: 2.840 	|	Learning rate: 6.23e-04
+Batch: 600 	|	 Training loss: 2.579 	|	Learning rate: 6.50e-04
+Batch: 700 	|	 Training loss: 2.468 	|	Learning rate: 6.77e-04
+Batch: 800 	|	 Training loss: 2.161 	|	Learning rate: 7.04e-04
+Batch: 900 	|	 Training loss: 2.216 	|	Learning rate: 7.30e-04
+Epoch: 3 | Latest training loss: 2.634 | Average training loss: 2.744 | 
+Average validation loss: 2.299 | Time taken: 2.61 min
+================================================================================
+Batch: 0 	|	 Training loss: 2.226 	|	Learning rate: 7.32e-04
+Batch: 100 	|	 Training loss: 2.000 	|	Learning rate: 7.59e-04
+Batch: 200 	|	 Training loss: 2.361 	|	Learning rate: 7.86e-04
+Batch: 300 	|	 Training loss: 2.183 	|	Learning rate: 8.04e-04
+Batch: 400 	|	 Training loss: 2.102 	|	Learning rate: 7.91e-04
+Batch: 500 	|	 Training loss: 2.059 	|	Learning rate: 7.78e-04
+Batch: 600 	|	 Training loss: 1.987 	|	Learning rate: 7.67e-04
+Batch: 700 	|	 Training loss: 1.876 	|	Learning rate: 7.55e-04
+Batch: 800 	|	 Training loss: 2.032 	|	Learning rate: 7.45e-04
+Batch: 900 	|	 Training loss: 2.118 	|	Learning rate: 7.34e-04
+Epoch: 4 | Latest training loss: 2.660 | Average training loss: 2.089 | 
+Average validation loss: 1.723 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 1.962 	|	Learning rate: 7.34e-04
+Batch: 100 	|	 Training loss: 1.714 	|	Learning rate: 7.24e-04
+Batch: 200 	|	 Training loss: 1.773 	|	Learning rate: 7.14e-04
+Batch: 300 	|	 Training loss: 1.490 	|	Learning rate: 7.05e-04
+Batch: 400 	|	 Training loss: 1.639 	|	Learning rate: 6.96e-04
+Batch: 500 	|	 Training loss: 1.525 	|	Learning rate: 6.88e-04
+Batch: 600 	|	 Training loss: 1.934 	|	Learning rate: 6.80e-04
+Batch: 700 	|	 Training loss: 1.607 	|	Learning rate: 6.72e-04
+Batch: 800 	|	 Training loss: 1.552 	|	Learning rate: 6.64e-04
+Batch: 900 	|	 Training loss: 1.439 	|	Learning rate: 6.57e-04
+Epoch: 5 | Latest training loss: 2.232 | Average training loss: 1.646 | 
+Average validation loss: 1.357 | Time taken: 2.63 min
+================================================================================
+Batch: 0 	|	 Training loss: 1.476 	|	Learning rate: 6.56e-04
+Batch: 100 	|	 Training loss: 1.349 	|	Learning rate: 6.49e-04
+Batch: 200 	|	 Training loss: 1.602 	|	Learning rate: 6.42e-04
+Batch: 300 	|	 Training loss: 1.259 	|	Learning rate: 6.35e-04
+Batch: 400 	|	 Training loss: 1.421 	|	Learning rate: 6.29e-04
+Batch: 500 	|	 Training loss: 1.288 	|	Learning rate: 6.23e-04
+Batch: 600 	|	 Training loss: 1.399 	|	Learning rate: 6.17e-04
+Batch: 700 	|	 Training loss: 1.212 	|	Learning rate: 6.11e-04
+Batch: 800 	|	 Training loss: 1.356 	|	Learning rate: 6.05e-04
+Batch: 900 	|	 Training loss: 1.348 	|	Learning rate: 5.99e-04
+Epoch: 6 | Latest training loss: 1.281 | Average training loss: 1.392 | 
+Average validation loss: 1.160 | Time taken: 2.63 min
+================================================================================
+Batch: 0 	|	 Training loss: 1.260 	|	Learning rate: 5.99e-04
+Batch: 100 	|	 Training loss: 1.274 	|	Learning rate: 5.94e-04
+Batch: 200 	|	 Training loss: 1.039 	|	Learning rate: 5.88e-04
+Batch: 300 	|	 Training loss: 1.097 	|	Learning rate: 5.83e-04
+Batch: 400 	|	 Training loss: 1.405 	|	Learning rate: 5.78e-04
+Batch: 500 	|	 Training loss: 1.412 	|	Learning rate: 5.73e-04
+Batch: 600 	|	 Training loss: 1.185 	|	Learning rate: 5.68e-04
+Batch: 700 	|	 Training loss: 1.311 	|	Learning rate: 5.64e-04
+Batch: 800 	|	 Training loss: 1.233 	|	Learning rate: 5.59e-04
+Batch: 900 	|	 Training loss: 1.220 	|	Learning rate: 5.55e-04
+Epoch: 7 | Latest training loss: 1.348 | Average training loss: 1.218 | 
+Average validation loss: 1.015 | Time taken: 2.63 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.917 	|	Learning rate: 5.55e-04
+Batch: 100 	|	 Training loss: 1.099 	|	Learning rate: 5.50e-04
+Batch: 200 	|	 Training loss: 0.940 	|	Learning rate: 5.46e-04
+Batch: 300 	|	 Training loss: 1.277 	|	Learning rate: 5.42e-04
+Batch: 400 	|	 Training loss: 1.037 	|	Learning rate: 5.38e-04
+Batch: 500 	|	 Training loss: 1.012 	|	Learning rate: 5.34e-04
+Batch: 600 	|	 Training loss: 1.173 	|	Learning rate: 5.30e-04
+Batch: 700 	|	 Training loss: 1.120 	|	Learning rate: 5.26e-04
+Batch: 800 	|	 Training loss: 1.143 	|	Learning rate: 5.23e-04
+Batch: 900 	|	 Training loss: 1.106 	|	Learning rate: 5.19e-04
+Epoch: 8 | Latest training loss: 0.820 | Average training loss: 1.088 | 
+Average validation loss: 0.868 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 1.027 	|	Learning rate: 5.19e-04
+Batch: 100 	|	 Training loss: 0.811 	|	Learning rate: 5.15e-04
+Batch: 200 	|	 Training loss: 0.857 	|	Learning rate: 5.12e-04
+Batch: 300 	|	 Training loss: 1.105 	|	Learning rate: 5.08e-04
+Batch: 400 	|	 Training loss: 0.951 	|	Learning rate: 5.05e-04
+Batch: 500 	|	 Training loss: 1.014 	|	Learning rate: 5.02e-04
+Batch: 600 	|	 Training loss: 0.911 	|	Learning rate: 4.99e-04
+Batch: 700 	|	 Training loss: 1.075 	|	Learning rate: 4.95e-04
+Batch: 800 	|	 Training loss: 1.046 	|	Learning rate: 4.92e-04
+Batch: 900 	|	 Training loss: 0.974 	|	Learning rate: 4.89e-04
+Epoch: 9 | Latest training loss: 0.933 | Average training loss: 0.980 | 
+Average validation loss: 0.763 | Time taken: 2.63 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.917 	|	Learning rate: 4.89e-04
+Batch: 100 	|	 Training loss: 0.858 	|	Learning rate: 4.86e-04
+Batch: 200 	|	 Training loss: 0.860 	|	Learning rate: 4.83e-04
+Batch: 300 	|	 Training loss: 0.866 	|	Learning rate: 4.80e-04
+Batch: 400 	|	 Training loss: 0.861 	|	Learning rate: 4.78e-04
+Batch: 500 	|	 Training loss: 0.807 	|	Learning rate: 4.75e-04
+Batch: 600 	|	 Training loss: 0.944 	|	Learning rate: 4.72e-04
+Batch: 700 	|	 Training loss: 0.898 	|	Learning rate: 4.69e-04
+Batch: 800 	|	 Training loss: 0.919 	|	Learning rate: 4.67e-04
+Batch: 900 	|	 Training loss: 0.999 	|	Learning rate: 4.64e-04
+Epoch: 10 | Latest training loss: 0.679 | Average training loss: 0.885 | 
+Average validation loss: 0.659 | Time taken: 2.63 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.726 	|	Learning rate: 4.64e-04
+Batch: 100 	|	 Training loss: 0.671 	|	Learning rate: 4.61e-04
+Batch: 200 	|	 Training loss: 0.744 	|	Learning rate: 4.59e-04
+Batch: 300 	|	 Training loss: 0.813 	|	Learning rate: 4.57e-04
+Batch: 400 	|	 Training loss: 0.863 	|	Learning rate: 4.54e-04
+Batch: 500 	|	 Training loss: 0.999 	|	Learning rate: 4.52e-04
+Batch: 600 	|	 Training loss: 0.738 	|	Learning rate: 4.49e-04
+Batch: 700 	|	 Training loss: 0.848 	|	Learning rate: 4.47e-04
+Batch: 800 	|	 Training loss: 0.850 	|	Learning rate: 4.45e-04
+Batch: 900 	|	 Training loss: 0.823 	|	Learning rate: 4.43e-04
+Epoch: 11 | Latest training loss: 0.817 | Average training loss: 0.800 | 
+Average validation loss: 0.578 | Time taken: 2.63 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.592 	|	Learning rate: 4.42e-04
+Batch: 100 	|	 Training loss: 0.744 	|	Learning rate: 4.40e-04
+Batch: 200 	|	 Training loss: 0.724 	|	Learning rate: 4.38e-04
+Batch: 300 	|	 Training loss: 0.756 	|	Learning rate: 4.36e-04
+Batch: 400 	|	 Training loss: 0.694 	|	Learning rate: 4.34e-04
+Batch: 500 	|	 Training loss: 0.786 	|	Learning rate: 4.32e-04
+Batch: 600 	|	 Training loss: 0.925 	|	Learning rate: 4.30e-04
+Batch: 700 	|	 Training loss: 0.745 	|	Learning rate: 4.28e-04
+Batch: 800 	|	 Training loss: 0.749 	|	Learning rate: 4.26e-04
+Batch: 900 	|	 Training loss: 0.817 	|	Learning rate: 4.24e-04
+Epoch: 12 | Latest training loss: 0.784 | Average training loss: 0.724 | 
+Average validation loss: 0.507 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.647 	|	Learning rate: 4.24e-04
+Batch: 100 	|	 Training loss: 0.599 	|	Learning rate: 4.22e-04
+Batch: 200 	|	 Training loss: 0.675 	|	Learning rate: 4.20e-04
+Batch: 300 	|	 Training loss: 0.666 	|	Learning rate: 4.18e-04
+Batch: 400 	|	 Training loss: 0.631 	|	Learning rate: 4.16e-04
+Batch: 500 	|	 Training loss: 0.739 	|	Learning rate: 4.14e-04
+Batch: 600 	|	 Training loss: 0.705 	|	Learning rate: 4.12e-04
+Batch: 700 	|	 Training loss: 0.616 	|	Learning rate: 4.11e-04
+Batch: 800 	|	 Training loss: 0.634 	|	Learning rate: 4.09e-04
+Batch: 900 	|	 Training loss: 0.603 	|	Learning rate: 4.07e-04
+Epoch: 13 | Latest training loss: 0.827 | Average training loss: 0.657 | 
+Average validation loss: 0.449 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.548 	|	Learning rate: 4.07e-04
+Batch: 100 	|	 Training loss: 0.589 	|	Learning rate: 4.05e-04
+Batch: 200 	|	 Training loss: 0.545 	|	Learning rate: 4.04e-04
+Batch: 300 	|	 Training loss: 0.619 	|	Learning rate: 4.02e-04
+Batch: 400 	|	 Training loss: 0.583 	|	Learning rate: 4.00e-04
+Batch: 500 	|	 Training loss: 0.618 	|	Learning rate: 3.99e-04
+Batch: 600 	|	 Training loss: 0.502 	|	Learning rate: 3.97e-04
+Batch: 700 	|	 Training loss: 0.677 	|	Learning rate: 3.95e-04
+Batch: 800 	|	 Training loss: 0.488 	|	Learning rate: 3.94e-04
+Batch: 900 	|	 Training loss: 0.678 	|	Learning rate: 3.92e-04
+Epoch: 14 | Latest training loss: 0.508 | Average training loss: 0.594 | 
+Average validation loss: 0.394 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.453 	|	Learning rate: 3.92e-04
+Batch: 100 	|	 Training loss: 0.617 	|	Learning rate: 3.91e-04
+Batch: 200 	|	 Training loss: 0.562 	|	Learning rate: 3.89e-04
+Batch: 300 	|	 Training loss: 0.452 	|	Learning rate: 3.88e-04
+Batch: 400 	|	 Training loss: 0.590 	|	Learning rate: 3.86e-04
+Batch: 500 	|	 Training loss: 0.605 	|	Learning rate: 3.85e-04
+Batch: 600 	|	 Training loss: 0.581 	|	Learning rate: 3.83e-04
+Batch: 700 	|	 Training loss: 0.579 	|	Learning rate: 3.82e-04
+Batch: 800 	|	 Training loss: 0.586 	|	Learning rate: 3.80e-04
+Batch: 900 	|	 Training loss: 0.575 	|	Learning rate: 3.79e-04
+Epoch: 15 | Latest training loss: 0.444 | Average training loss: 0.538 | 
+Average validation loss: 0.352 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.488 	|	Learning rate: 3.79e-04
+Batch: 100 	|	 Training loss: 0.481 	|	Learning rate: 3.77e-04
+Batch: 200 	|	 Training loss: 0.414 	|	Learning rate: 3.76e-04
+Batch: 300 	|	 Training loss: 0.487 	|	Learning rate: 3.75e-04
+Batch: 400 	|	 Training loss: 0.488 	|	Learning rate: 3.73e-04
+Batch: 500 	|	 Training loss: 0.519 	|	Learning rate: 3.72e-04
+Batch: 600 	|	 Training loss: 0.474 	|	Learning rate: 3.71e-04
+Batch: 700 	|	 Training loss: 0.520 	|	Learning rate: 3.69e-04
+Batch: 800 	|	 Training loss: 0.514 	|	Learning rate: 3.68e-04
+Batch: 900 	|	 Training loss: 0.649 	|	Learning rate: 3.67e-04
+Epoch: 16 | Latest training loss: 0.882 | Average training loss: 0.494 | 
+Average validation loss: 0.316 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.503 	|	Learning rate: 3.67e-04
+Batch: 100 	|	 Training loss: 0.452 	|	Learning rate: 3.66e-04
+Batch: 200 	|	 Training loss: 0.474 	|	Learning rate: 3.64e-04
+Batch: 300 	|	 Training loss: 0.457 	|	Learning rate: 3.63e-04
+Batch: 400 	|	 Training loss: 0.438 	|	Learning rate: 3.62e-04
+Batch: 500 	|	 Training loss: 0.454 	|	Learning rate: 3.61e-04
+Batch: 600 	|	 Training loss: 0.453 	|	Learning rate: 3.59e-04
+Batch: 700 	|	 Training loss: 0.432 	|	Learning rate: 3.58e-04
+Batch: 800 	|	 Training loss: 0.436 	|	Learning rate: 3.57e-04
+Batch: 900 	|	 Training loss: 0.456 	|	Learning rate: 3.56e-04
+Epoch: 17 | Latest training loss: 0.365 | Average training loss: 0.448 | 
+Average validation loss: 0.283 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.392 	|	Learning rate: 3.56e-04
+Batch: 100 	|	 Training loss: 0.381 	|	Learning rate: 3.55e-04
+Batch: 200 	|	 Training loss: 0.404 	|	Learning rate: 3.54e-04
+Batch: 300 	|	 Training loss: 0.389 	|	Learning rate: 3.52e-04
+Batch: 400 	|	 Training loss: 0.366 	|	Learning rate: 3.51e-04
+Batch: 500 	|	 Training loss: 0.363 	|	Learning rate: 3.50e-04
+Batch: 600 	|	 Training loss: 0.400 	|	Learning rate: 3.49e-04
+Batch: 700 	|	 Training loss: 0.452 	|	Learning rate: 3.48e-04
+Batch: 800 	|	 Training loss: 0.500 	|	Learning rate: 3.47e-04
+Batch: 900 	|	 Training loss: 0.478 	|	Learning rate: 3.46e-04
+Epoch: 18 | Latest training loss: 0.586 | Average training loss: 0.411 | 
+Average validation loss: 0.261 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.366 	|	Learning rate: 3.46e-04
+Batch: 100 	|	 Training loss: 0.367 	|	Learning rate: 3.45e-04
+Batch: 200 	|	 Training loss: 0.373 	|	Learning rate: 3.44e-04
+Batch: 300 	|	 Training loss: 0.320 	|	Learning rate: 3.43e-04
+Batch: 400 	|	 Training loss: 0.359 	|	Learning rate: 3.42e-04
+Batch: 500 	|	 Training loss: 0.399 	|	Learning rate: 3.41e-04
+Batch: 600 	|	 Training loss: 0.372 	|	Learning rate: 3.40e-04
+Batch: 700 	|	 Training loss: 0.336 	|	Learning rate: 3.39e-04
+Batch: 800 	|	 Training loss: 0.397 	|	Learning rate: 3.38e-04
+Batch: 900 	|	 Training loss: 0.403 	|	Learning rate: 3.37e-04
+Epoch: 19 | Latest training loss: 0.372 | Average training loss: 0.377 | 
+Average validation loss: 0.239 | Time taken: 2.62 min
+================================================================================
+Batch: 0 	|	 Training loss: 0.324 	|	Learning rate: 3.37e-04
+Batch: 100 	|	 Training loss: 0.315 	|	Learning rate: 3.36e-04
+Batch: 200 	|	 Training loss: 0.294 	|	Learning rate: 3.35e-04
+Batch: 300 	|	 Training loss: 0.290 	|	Learning rate: 3.34e-04
+Batch: 400 	|	 Training loss: 0.310 	|	Learning rate: 3.33e-04
+Batch: 500 	|	 Training loss: 0.305 	|	Learning rate: 3.32e-04
+Batch: 600 	|	 Training loss: 0.316 	|	Learning rate: 3.31e-04
+Batch: 700 	|	 Training loss: 0.348 	|	Learning rate: 3.30e-04
+Batch: 800 	|	 Training loss: 0.367 	|	Learning rate: 3.29e-04
+Batch: 900 	|	 Training loss: 0.421 	|	Learning rate: 3.28e-04
+Epoch: 20 | Latest training loss: 0.325 | Average training loss: 0.349 | 
+Average validation loss: 0.222 | Time taken: 2.62 min
+================================================================================
