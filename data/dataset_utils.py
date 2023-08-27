@@ -4,33 +4,15 @@ import torchtext.datasets as datasets
 from sklearn.model_selection import train_test_split
 from torchtext.data.functional import to_map_style_dataset
 from tqdm import tqdm
+from data.old_dataset_utils import Batch
+from torch.utils.data import DataLoader
 
-class DatasetPreprocessor:
-    def __init__(self,
-                 tokenizer_src, 
-                 tokenizer_tgt, 
-                 vocab_src, 
-                 vocab_tgt,
-                 max_padding):
-        self.tokenizer_src = tokenizer_src
-        self.tokenizer_tgt = tokenizer_tgt
-        self.vocab_src = vocab_src
-        self.vocab_tgt = vocab_tgt
-        self.max_padding = max_padding
-
-    def tensor_to_sentence(self, sentence, tokenizer, vocab):
-        '''
-        Reverse operations to those described under 
-        :meth:`<dataset_utils.DatasetPreprocessor.sentence_to_tensor>`
-        '''
-        # get ids for beginning and end of sentence, and padding markers
-        bos_id, eos_id, pad_id = 0, 1, 2
-        raise NotImplementedError
-
+class SentenceProcessor:
     def sentence_to_tensor(self, sentence, tokenizer, vocab):
         '''
         Performs the following operations:
         - tokenize sentence
+        - convert data type of the sequence of tokens to a tensor
         - add beginning of sentence and end of sentence markers
         - pad end of sentence up to max_padding
         '''
@@ -46,11 +28,31 @@ class DatasetPreprocessor:
         pad_size = (0, self.max_padding - len(token_ids_tensor))
         padded_token_ids = pad(token_ids_tensor, pad_size, value=pad_id)
         return padded_token_ids
-
-    def preprocess_dataset(self, raw_dataset):
+    
+    def tensor_to_sentence(self, padded_token_ids, tokenizer, vocab):
         '''
-        Preprocess dataset sentence by sentence, as detailed in 
-        :meth:`<dataset_utils.DatasetPreprocessor.sentence_to_tensor>`
+        Reverse operations to those described under 
+        :meth:`<dataset_utils.SentenceProcessor.sentence_to_tensor>`
+        '''
+        # get ids for beginning and end of sentence, and padding markers
+        bos_id, eos_id, pad_id = 0, 1, 2
+        raise NotImplementedError
+
+
+class DataProcessor(SentenceProcessor):
+    def __init__(self, tokenizer_src, tokenizer_tgt, vocab_src, vocab_tgt,
+                 max_padding):
+        super().__init__()
+        self.tokenizer_src = tokenizer_src
+        self.tokenizer_tgt = tokenizer_tgt
+        self.vocab_src = vocab_src
+        self.vocab_tgt = vocab_tgt
+        self.max_padding = max_padding
+
+    def preprocess_data(self, raw_dataset):
+        '''
+        Preprocess raw data sentence by sentence, as detailed in 
+        :meth:`<dataset_utils.SentenceProcessor.sentence_to_tensor>`
         '''
         data_map = to_map_style_dataset(raw_dataset) # map allows access to length of dataset
         # initialize an empty preprocessed dataset
@@ -71,19 +73,20 @@ class DatasetPreprocessor:
         
         return preprocessed_dataset
     
-    def get_preprocessed_dataset(self):
-        raw_dataset = self.get_raw_dataset()
-        preprocd_dataset = self.preprocess_dataset(raw_dataset)
-        return preprocd_dataset
+    def get_preprocessed_data(self):
+
+        raw_dataset = self.get_raw_data()
+        preprocd_data = self.preprocess_data(raw_dataset)
+        return preprocd_data
         
     @staticmethod
-    def get_raw_dataset():
+    def get_raw_data():
         train_iter, valid_iter, test_iter = datasets.Multi30k(language_pair=("de", "en"))
         raw_dataset = train_iter + valid_iter + test_iter
         return raw_dataset
     
     @staticmethod
-    def get_dataset_splits(dataset, split_ratio=(0.8, 0.1, 0.1)):
+    def get_dataset_splits(dataset, split_ratio=(0.8, 0.1, 0.1), random_seed=None):
         '''
         Splits a given dataset into train, validation and test sets as
         determined by the specified split ratio
@@ -91,14 +94,17 @@ class DatasetPreprocessor:
         train_size, val_size, test_size = split_ratio
         train_dataset, val_and_test_dataset = train_test_split(
             dataset,
-            train_size=train_size
+            train_size=train_size,
+            random_state=random_seed
         )
         val_dataset, test_dataset = train_test_split(
             val_and_test_dataset,
-            train_size=val_size/(val_size+test_size)
+            train_size=val_size/(val_size+test_size),
+            random_state=random_seed
         )
         return train_dataset, val_dataset, test_dataset
-    
+
+
 class RuntimeDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, device):
         self.dataset = dataset
@@ -109,17 +115,24 @@ class RuntimeDataset(torch.utils.data.Dataset):
         '''
         Return a tensor corresponding to a single pair of sentences
         '''
-        sentence_pair = self.dataset[i]
-        return sentence_pair
+        tok_sentence_pair = self.dataset[i]
+        return tok_sentence_pair
     
     def __len__(self):
+        '''
+        Return length of entire dataset
+        '''
         return self.length
     
     def collate_fn(self, raw_batch):
+        '''
+        Collate a batch from N preprocessed data samples, where N is 
+        the batch size specified in the dataloader.
+        '''
         batch_tensor = torch.stack(raw_batch)
         batch_src = batch_tensor[:,0,:].to(self.device)
         batch_tgt = batch_tensor[:,1,:].to(self.device)
-        return batch_src, batch_tgt
+        return Batch(batch_src, batch_tgt)
     
 class RuntimeDataLoader(torch.utils.data.DataLoader):
     def __init__(self, 
@@ -132,31 +145,43 @@ class RuntimeDataLoader(torch.utils.data.DataLoader):
                                             shuffle=shuffle,
                                             collate_fn=collate_fn)
         
-def load_datasets(tokenizer_src,
-                  tokenizer_tgt,
-                  vocab_src,
-                  vocab_tgt,
-                  config,
-                  device,
-                  preprocess=True):
+def load_datasets(tokenizer_src, tokenizer_tgt, vocab_src, vocab_tgt, 
+                  max_padding, device, random_seed=None):
     
-    dataset_preprocessor = DatasetPreprocessor(tokenizer_src,
-                                               tokenizer_tgt,
-                                               vocab_src,
-                                               vocab_tgt,
-                                               config["max_padding"])
-    preprocd_dataset = dataset_preprocessor.get_preprocessed_dataset()
+    data_processor = DataProcessor(tokenizer_src,
+                                            tokenizer_tgt,
+                                            vocab_src,
+                                            vocab_tgt,
+                                            max_padding)
+    preprocd_data = data_processor.get_preprocessed_data()
     
-    (preprocd_train_dataset, 
-     preprocd_val_dataset, 
-     preprocd_test_dataset) = dataset_preprocessor.get_dataset_splits(preprocd_dataset)
+    (preprocd_train_data, 
+     preprocd_val_data, 
+     preprocd_test_data) = data_processor.get_dataset_splits(
+        preprocd_data, random_seed=random_seed
+    )
     
-    train_dataset = RuntimeDataset(preprocd_train_dataset, device)
-    val_dataset = RuntimeDataset(preprocd_val_dataset, device)
-    test_dataset = RuntimeDataset(preprocd_test_dataset, device)
+    train_dataset = RuntimeDataset(preprocd_train_data, device)
+    val_dataset = RuntimeDataset(preprocd_val_data, device)
+    test_dataset = RuntimeDataset(preprocd_test_data, device)
 
     return train_dataset, val_dataset, test_dataset
 
     
-def load_dataloaders():
-    pass
+def load_dataloaders(train_dataset, val_dataset, test_dataset, 
+                     batch_size, shuffle=True):
+    train_dataloader = DataLoader(dataset=train_dataset, 
+                                  batch_size=batch_size, 
+                                  shuffle=shuffle,
+                                  collate_fn=train_dataset.collate_fn)
+    
+    val_dataloader = DataLoader(dataset=val_dataset, 
+                                batch_size=batch_size, 
+                                shuffle=shuffle,
+                                collate_fn=val_dataset.collate_fn)
+    
+    test_dataloader = DataLoader(dataset=val_dataset, 
+                                batch_size=batch_size, 
+                                shuffle=shuffle,
+                                collate_fn=val_dataset.collate_fn)
+    return train_dataloader, val_dataloader, test_dataloader

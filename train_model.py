@@ -2,17 +2,15 @@ import argparse
 import time
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 import torchtext.datasets as datasets
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from torch.optim.lr_scheduler import LambdaLR
 from model.full_model import TransformerModel
-from old_dataset_utils import Batch
-from data_utils.vocab_utils import build_tokenizers, build_vocabularies
-from data_utils.dataset_utils import load_datasets
-from path_utils import SaveDirs
-from training_utils.loss_utils import SimpleLossCompute, LabelSmoothing
+from vocab.vocab_utils import build_tokenizers, build_vocabularies
+from data.dataset_utils import load_datasets, load_dataloaders
+from training.path_utils import SaveDirs
+from training.loss_utils import SimpleLossCompute, LabelSmoothing
 
 from torchtext.data.functional import to_map_style_dataset #TODO: remove
 
@@ -61,24 +59,14 @@ def train(train_dataloader, val_dataloader, model, criterion,
     
     train_history, val_history = [], []
     for epoch in range(1, config["num_epochs"]+1): # epochs are 1-indexed
-        # create batched data loaders
-        batched_train_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
-                                    for b in train_dataloader)
-        batched_val_dataloader = (Batch(b[0], b[1], config["pad_idx"]) 
-                                    for b in val_dataloader)
         # initialize timer
         start = time.time()
         # training
-        total_train_loss, epoch_latest_train_loss = run_train_epoch(
-            batched_train_dataloader, 
-            model, criterion, optimizer, scheduler, 
-            config["accum_iter"]
-        )
-        epoch_avg_train_loss = total_train_loss / len(train_dataloader)
+        epoch_avg_train_loss = run_train_epoch(train_dataloader, model, 
+                                               criterion, optimizer, scheduler, 
+                                               config["accum_iter"])
         # validation
-        total_val_loss = run_val_epoch(batched_val_dataloader, model, 
-                                           criterion)
-        epoch_avg_val_loss = total_val_loss / len(val_dataloader)
+        epoch_avg_val_loss = run_val_epoch(val_dataloader, model, criterion)
 
         # Accumulate loss history, train loss should be the latest train loss  
         # since validation is done at end of entire training epoch
@@ -87,7 +75,6 @@ def train(train_dataloader, val_dataloader, model, criterion,
 
         # print losses
         print(f"Epoch: {epoch} | "
-              f"Latest training loss: {epoch_latest_train_loss:.3f} | "
               f"Average training loss: {epoch_avg_train_loss:.3f} | \n"
               f"Average validation loss: {epoch_avg_val_loss:.3f} | "
               f"Time taken: {1/60*(time.time() - start):.2f} min")
@@ -95,52 +82,55 @@ def train(train_dataloader, val_dataloader, model, criterion,
 
         # save model
         torch.save(model.state_dict(), 
-                   f'{config["model_save_name"]}_epoch_{epoch}.pt')
+                   f'{config["model_save_name"]}_epoch_{epoch:02d}.pt')
 
     # plot and save loss curves
     plot_losses(train_history, val_history)
 
-def run_train_epoch(batched_train_dataloader, model, criterion, optimizer, 
+def run_train_epoch(train_dataloader, model, criterion, optimizer, 
                     scheduler, accum_iter):
     # put model in training mode
     model.train()
     # iterate over the training data and compute losses
     total_loss, latest_loss = 0, 0
-    for i, batch in enumerate(batched_train_dataloader):
+    for i, batch in enumerate(train_dataloader):
         output_probabilities = model.forward(batch.src, 
                                              batch.tgt_shifted_right,
                                              batch.decoder_attn_mask)
         loss = criterion(output_probabilities, batch.tgt_label, batch.ntokens)
+        # backprop
         loss.backward()
+        # step optimizer 
         if i % accum_iter == 0:
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
+        # step learning rate
+        scheduler.step()
+        # accumulate loss
         latest_loss = loss.data
         total_loss += latest_loss
-        scheduler.step()
-        
         # print metrics
         if i % 100 == 0:
-            print(f"Batch: {i} \t|\t Training loss: {latest_loss:.3f} \t|\t"
+            print(f"Batch: {i} \t|\t Latest training loss: {latest_loss:.3f} \t|\t"
                   f"Learning rate: {optimizer.param_groups[0]['lr']:.2e}")
 
-    return total_loss, latest_loss
+    avg_loss = total_loss / len(train_dataloader)
+    return avg_loss
 
-def run_val_epoch(batched_val_dataloader, model, criterion):
+def run_val_epoch(val_dataloader, model, criterion):
     # put model in evaluation mode
     model.eval()
     # iterate over the validation data and compute losses
     total_loss = 0
-    for i, batch in enumerate(batched_val_dataloader):
+    for batch in val_dataloader:
         output_probabilities = model.forward(batch.src, batch.tgt_shifted_right, 
                                              batch.decoder_attn_mask)
-        loss = criterion(output_probabilities, 
-                              batch.tgt_label, 
-                              batch.ntokens)
-        loss.backward()
+        loss = criterion(output_probabilities, batch.tgt_label, batch.ntokens)
+        # accumulate loss
         total_loss += loss.data
     
-    return total_loss
+    avg_loss = total_loss / len(val_dataloader)
+    return avg_loss
 
 def plot_losses(train_history, val_history):
     plt.figure(dpi=300)
@@ -174,39 +164,29 @@ if __name__ == "__main__":
     model = model.to(device)
     
     # load data
-    train_dataset, val_dataset, test_dataset = load_datasets(
-        tokenizer_src, 
-        tokenizer_tgt, 
-        vocab_src.vocab,
-        vocab_tgt.vocab, 
-        config,
-        device,
-        preprocess=True
-    )
+    train_dataset, val_dataset, test_dataset = load_datasets(tokenizer_src, 
+                                                             tokenizer_tgt, 
+                                                             vocab_src.vocab,
+                                                             vocab_tgt.vocab, 
+                                                             config["max_padding"],
+                                                             device)
 
-    train_dataloader = DataLoader(dataset=train_dataset, 
-                                  batch_size=config["batch_size"], 
-                                  shuffle=True,
-                                  collate_fn=train_dataset.collate_fn)
-    
-    val_dataloader = DataLoader(dataset=val_dataset, 
-                                batch_size=config["batch_size"], 
-                                shuffle=True,
-                                collate_fn=val_dataset.collate_fn)
+    train_dataloader, val_dataloader, _ = load_dataloaders(train_dataset, 
+                                                           val_dataset, 
+                                                           test_dataset,
+                                                           config["batch_size"],
+                                                           shuffle=True)
     
     # create loss criterion, learning rate optimizer and scheduler
     label_smoothing = LabelSmoothing(config["tgt_vocab_size"], config["pad_idx"], 0.1)
     label_smoothing = label_smoothing.to(device)
     criterion = SimpleLossCompute(label_smoothing)
-    
-    # criterion = criterion.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config["base_lr"], 
                                  betas=(0.9, 0.98), eps=1e-9)
     scheduler = LambdaLR(optimizer = optimizer, 
-                            lr_lambda = lambda step_num: get_learning_rate(
-                                step_num+1, config["d_model"], factor=1, 
-                                warmup=config["warmup"])
-    )
+                         lr_lambda = lambda step_num: get_learning_rate(
+                         step_num+1, config["d_model"], factor=1, 
+                         warmup=config["warmup"]))
     
     # train
     train(train_dataloader, val_dataloader, model, criterion, optimizer, scheduler, config)

@@ -40,25 +40,35 @@ class TransformerModel(nn.Module):
 
     def encode(self, src):
         # embed and add positional encoding
+        # print(f'src: {src.shape}')
         input_embeddings = self.input_embedding_layer(src)
+        # print(f'input_embeddings: {input_embeddings.shape}')
         input_embeddings_with_positions = self.input_positional_enc_layer(input_embeddings)
+        # print(f'input_embeddings_with_positions: {input_embeddings_with_positions.shape}')
         # encode
         encoder_stack_output = self.encoder_decoder.encoder_stack(input_embeddings_with_positions)
+        # print(f'encoder_stack_output: {encoder_stack_output.shape}')
         return encoder_stack_output
 
     def decode(self, tgt, memory, decoder_attn_mask):
         # embed and add positional encoding
+        # print(f'tgt: {tgt.shape}')
         output_embeddings = self.output_embedding_layer(tgt)
+        # print(f'output_embeddings: {output_embeddings.shape}')
         output_embeddings_with_positions = self.output_positional_enc_layer(output_embeddings)
+        # print(f'output_embeddings_with_positions: {output_embeddings_with_positions.shape}')
         # decode
         decoder_stack_output = self.encoder_decoder.decoder_stack(output_embeddings_with_positions, memory, decoder_attn_mask)
+        # print(f'decoder_stack_output: {decoder_stack_output.shape}')
         return decoder_stack_output
 
     def forward(self, src, tgt, decoder_attn_mask):
         encoder_stack_output = self.encode(src)
         decoder_stack_output = self.decode(tgt, encoder_stack_output, decoder_attn_mask)
         output_probabilities = self.linear_softmax_layers(decoder_stack_output)
-
+        # print(f'linear_softmax_layers_output ie. output_probabilities: {output_probabilities.shape}')
+        # print('-'*60)
+        # print('\n')
         return output_probabilities
 
 
@@ -162,6 +172,10 @@ class DecoderStack(nn.Module):
 
     def forward(self, x, memory, decoder_attn_mask):
         layer_input = x
+        # print('*'*60)
+        # print(f"layer_input in decoder stack {layer_input.shape}")
+        # print(f"decoder_attn_mask in decoder stack {decoder_attn_mask.shape}")
+        # print('*'*60)
         for layer in self.decoder_layers:
             # compute layer output
             layer_output = layer(layer_input, memory, decoder_attn_mask)
@@ -350,7 +364,7 @@ class MultiHeadedAttention(nn.Module):
         derived_queries = reshape_fn(self.w_q(query))
         derived_keys = reshape_fn(self.w_k(key))
         derived_values = reshape_fn(self.w_v(value))
-
+        
         # compute attention
         attention_outputs, attention_weightings = \
             attention_fn(derived_queries, derived_keys, derived_values,
@@ -361,8 +375,30 @@ class MultiHeadedAttention(nn.Module):
         reshaped_attention_outputs = attention_outputs.transpose(1, 2).contiguous().view(batch_size, -1, self.h * self.d_k)
         # pass through final linear layer
         result = self.linear_layer(reshaped_attention_outputs)
-        del query, key, value, derived_queries, derived_keys, derived_values
+        
 
+        # if attention_mask is not None:
+            # print("*"*60)
+            # print(f'attention_mask: {attention_mask.shape}')
+            # print(f'attention_mask_tensor: {attention_mask_tensor.shape}')
+        
+            # print(f'query: {query.shape}')
+            # print(f'key: {key.shape}')
+            # print(f'value: {value.shape}')
+
+            # print(f'derived_queries: {derived_queries.shape}')
+            # print(f'derived_keys: {derived_keys.shape}')
+            # print(f'derived_values: {derived_values.shape}')
+
+            # print(f'attention_outputs: {attention_outputs.shape}')
+            # print(f'attention_weightings: {attention_weightings.shape}')
+
+            # print(f'reshaped_attention_outputs: {reshaped_attention_outputs.shape}')
+
+            # print(f'result: {result.shape}')
+
+        del query, key, value, derived_queries, derived_keys, derived_values
+        
         return result
 
 

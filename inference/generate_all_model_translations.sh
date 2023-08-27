@@ -1,4 +1,5 @@
 #!/bin/bash
+# Run this script from the project root directory
 NEPOCHS=20
 EPOCHS=$(for x in `seq $NEPOCHS`; do if [ $x -lt 10 ]; then echo 0$x;  else echo $x; fi;  done)
 

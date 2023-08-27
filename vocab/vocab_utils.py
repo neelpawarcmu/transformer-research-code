@@ -4,16 +4,6 @@ import os
 from torchtext.vocab import build_vocab_from_iterator
 import torchtext.datasets as datasets
 
-"""
-class DataLoader
-
-class Dataset
-
-class Tokenizer
-
-class Vocab
-"""
-
 class Vocabulary:
     def __init__(self, language, tokenizer):
         self.language = language

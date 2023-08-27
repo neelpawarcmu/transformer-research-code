@@ -2,4 +2,4 @@
 
 Very init commit:
 
-To run code, run `create_model.py` with any additional arguments if desired.
+To run code, run `train_model.py` with any additional arguments if desired.
