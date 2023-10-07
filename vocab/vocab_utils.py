@@ -2,73 +2,73 @@ import torch
 import spacy
 import os
 from torchtext.vocab import build_vocab_from_iterator
-import torchtext.datasets as datasets
 
-class Vocabulary:
-    def __init__(self, language, tokenizer):
-        self.language = language
+class VocabularyBuilder:
+    def __init__(self, tokenizer, data, vocab_type):
+        self.vocab_type = vocab_type
         self.tokenize_fn = tokenizer.tokenize
-        self.build_vocabulary()
+        self.vocab = self.build_vocabulary(data)
+        self.vocab.length = len(self.vocab)
+        self.vocab.language = tokenizer.language
 
-    def build_vocabulary(self):
-        # get raw data
-        train, val, test = datasets.Multi30k(language_pair=("de", "en"))
-
-        # create vocab from tokenized raw data
+    def build_vocabulary(self, data):
+        '''
+        Creates vocab from tokenized raw data
+        '''
         vocab = build_vocab_from_iterator(
-            iterator = self._yield_tokens(data_iterator = train+val+test),
+            iterator = self._yield_tokens(data_iterator = data),
             min_freq = 2,
             specials = ["<s>", "</s>", "<blank>", "<unk>"],
         )
         vocab.set_default_index(vocab["<unk>"])
-        self.vocab = vocab
+        return vocab
     
     def _yield_tokens(self, data_iterator):
-        for ger, eng in data_iterator:
-            if self.language == "german":
-                yield self.tokenize_fn(ger)
-            elif self.language == "english":
-                yield self.tokenize_fn(eng)
+        for src_sentence, tgt_sentence in data_iterator:
+            if self.vocab_type == "src":
+                yield self.tokenize_fn(src_sentence)
+            elif self.vocab_type == "tgt":
+                yield self.tokenize_fn(tgt_sentence)
 
 class SpacyTokenizer:
     def __init__(self, language):
-        self.model_names = {"english": "en_core_web_sm", 
-                            "german": "de_core_news_sm"}
+        self.available_pipelines = {"en": "en_core_web_sm", 
+                                    "de": "de_core_news_sm"}
         self.language = language
-        self.load_spacy_model()
+        self.load_spacy_pipeline()
        
-    def load_spacy_model(self):
-        model_name = self.model_names[self.language]
+    def load_spacy_pipeline(self):
+        pipeline_name = self.available_pipelines[self.language]
         try:
-            self.spacy_model = spacy.load(model_name)
+            self.spacy_pipeline = spacy.load(pipeline_name)
         except:
-            os.system(f"python3 -m spacy download {model_name}")
-            self.spacy_model = spacy.load(model_name)
+            os.system(f"python3 -m spacy download {pipeline_name}")
+            self.spacy_pipeline = spacy.load(pipeline_name)
 
     def tokenize(self, text):
-        return [tok.text for tok in self.spacy_model.tokenizer(text)]
+        return [tok.text for tok in self.spacy_pipeline.tokenizer(text)]
 
 # build tokenizers and vocabularies for source and target languages
-def build_tokenizers():
-    tokenizer_ger = SpacyTokenizer("german")
-    tokenizer_eng = SpacyTokenizer("english")
-    return tokenizer_ger, tokenizer_eng
+def build_tokenizers(language_pair):
+    tokenizer_src = SpacyTokenizer(language_pair[0])
+    tokenizer_tgt = SpacyTokenizer(language_pair[1])
+    return tokenizer_src, tokenizer_tgt
 
-def build_vocabularies(spacy_tokenizer_ger, spacy_tokenizer_eng):
+def build_vocabularies(tokenizer_src, tokenizer_tgt, data):
     """
     Load vocabs if saved, else create and save them locally.
     """
     save_path = "artifacts/saved_vocab/vocabs.pt"
 
     if os.path.exists(save_path):
-        vocab_ger, vocab_eng = torch.load(save_path)
+        vocab_src, vocab_tgt = torch.load(save_path)
     else:
-        vocab_ger = Vocabulary("german", spacy_tokenizer_ger)
-        vocab_eng = Vocabulary("english", spacy_tokenizer_eng)
-        torch.save((vocab_ger, vocab_eng), save_path)
+        vocab_src = VocabularyBuilder(tokenizer_src, data, "src").vocab
+        vocab_tgt = VocabularyBuilder(tokenizer_tgt, data, "tgt").vocab
+        torch.save((vocab_src, vocab_tgt), save_path)
     
     print("-"*80)
-    print(f"German vocabulary size: {len(vocab_ger.vocab)}")
-    print(f"English vocabulary size: {len(vocab_eng.vocab)}")
+    print(f"{vocab_src.language.upper()} vocabulary size: {vocab_src.length}")
+    print(f"{vocab_tgt.language.upper()} vocabulary size: {vocab_tgt.length}")
     print("-"*80)
-    return vocab_ger, vocab_eng
+    return vocab_src, vocab_tgt

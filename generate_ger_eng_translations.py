@@ -1,108 +1,71 @@
-import torch
+import json
 import argparse
+import torch
+from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
-from old_dataset_utils import create_dataloaders, Batch
-from data_utils.vocab_utils import build_tokenizers, build_vocabularies
-from data_utils.dataset_utils import load_datasets
+from vocab.vocab_utils import build_tokenizers, build_vocabularies
+from data.processors import DataProcessor
+from data.runtime_loaders import load_datasets
+from data.processors import SentenceProcessor
 from model.full_model import TransformerModel
-from path_utils import SaveDirs
+from training.save_utils import SaveDirs
+from inference.utils import greedy_decode, Translate
 
-
-def get_subseq_tokens_mask(size):
-    "Mask out subsequent positions."
-    attn_shape = (1, size, size)
-    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1)
-    return subsequent_mask == 0
-
-def greedy_decode(model, src, max_len, start_symbol):
-    ys = torch.zeros(1, 1).fill_(start_symbol).type_as(src.data)
-    for i in range(max_len - 1):
-        decoder_attn_mask = get_subseq_tokens_mask(ys.size(1)).type_as(src.data)
-        model_output = model(src, ys, decoder_attn_mask)
-        prob = model_output[:, -1]
-        _, next_word = torch.max(prob, dim=1)
-        next_word = next_word.data[0]
-        ys = torch.cat(
-            [ys, torch.zeros(1, 1).type_as(src.data).fill_(next_word)], dim=1
-        )
-        import pdb; pdb.set_trace()
-
-    return ys
-
-def check_outputs(
-    valid_dataloader,
-    model,
-    vocab_src,
-    vocab_tgt,
-    n_examples,
-    model_path,
-    pad_idx=2,
-    eos_string="</s>",
-):
-    results = [()] * n_examples
-    model_name, epoch_num = model_path.split(".")[0].split("/")[-1].split("_epoch_")
-
+def check_outputs(valid_dataloader, model, vocab_src, vocab_tgt, 
+                  num_examples, config):
+    results = [()] * num_examples
     print_text = ""
-    print_text += f"Transformer model name: {model_name} | Epoch: {epoch_num}\n"
+    print_text += f"Transformer layers: {config['N']} | Epoch: {config['epoch']}\n\n"
+    model.eval() 
 
-    for idx, batch in list(enumerate(valid_dataloader))[:n_examples]:
-        rb = Batch(batch[0], batch[1], pad_idx)
-
-        src_tokens = [
-            vocab_src.get_itos()[x] for x in rb.src[0] if x != pad_idx
-        ]
-        tgt_tokens = [
-            vocab_tgt.get_itos()[x] for x in rb.tgt_shifted_right[0] if x != pad_idx
-        ]
-
-        model_out = greedy_decode(model, rb.src, 72, 0)[0]
-        model_txt = (
-            " ".join(
-                [vocab_tgt.get_itos()[x] for x in model_out if x != pad_idx]
-            ).split(eos_string, 1)[0]
-            + eos_string
-        )
-
+    for idx, batch in list(enumerate(valid_dataloader))[:num_examples]:
+        model_pred_tokens = greedy_decode(model, batch, vocab_tgt)
+        src_sentence = SentenceProcessor.tokens_to_sentence(batch.src[0], vocab_src)
+        tgt_sentence = SentenceProcessor.tokens_to_sentence(batch.tgt_shifted_right[0], vocab_tgt)
+        model_pred_sentence = SentenceProcessor.tokens_to_sentence(model_pred_tokens[0], vocab_tgt)
         print_text += (
-            f"\nExample {idx+1} ========\n" + 
-            "Source Text (Input)        : " +
-            " ".join(src_tokens).replace("\n", "") +
-            "\n" + 
-            "Target Text (Ground Truth) : " +
-            " ".join(tgt_tokens).replace("\n", "") +
-            "\n" + 
-            "Model Output               : " +
-            model_txt.replace("\n", "") + 
-            "\n"
+            f"Example {idx+1} ========\n" + 
+            f"Source Text (Input): {src_sentence}\n" +
+            f"Target Text (Ground Truth): {tgt_sentence}\n" +
+            f"Model Output: {model_pred_sentence}\n\n"
         )
-
-        print(print_text)
-
-        results[idx] = (rb, src_tokens, tgt_tokens, model_out, model_txt)
+        results[idx] = (src_sentence, tgt_sentence, model_pred_sentence)
     return results, print_text
 
-def run_model_example(vocab_src, vocab_tgt, tokenizer_src, tokenizer_tgt, model_path, 
-                      output_path, n_examples=5):
+def run_model_example(vocab_src, vocab_tgt, tokenizer_src, tokenizer_tgt, 
+                      config):
 
     print("Preparing Data ...")
-    _, valid_dataloader = create_dataloaders(torch.device("cpu"), vocab_src, 
-                                             vocab_tgt, tokenizer_src, tokenizer_tgt, 
-                                             batch_size=1, shuffle=False)
-
+    _, val_dataset, _ = load_datasets(tokenizer_src, tokenizer_tgt, vocab_src,
+                                      vocab_tgt, max_padding=50,
+                                      device=torch.device("cpu"),
+                                      random_seed=4)
+    # TODO: remove redundancy and use dataloader creation util functions
+    valid_dataloader = DataLoader(dataset=val_dataset,
+                                  batch_size=1,
+                                  shuffle=False,
+                                  collate_fn=val_dataset.collate_fn)
+    
     print("Loading Trained Model ...")
-    model = TransformerModel(len(vocab_src), len(vocab_tgt), N=6)
+    model = TransformerModel(vocab_src.length, vocab_tgt.length, N=config["N"])
+    # load saved model weights
+    model_path = f"{config['model_dir']}/N{config['N']}/epoch_{config['epoch']:02d}.pt"
     model.load_state_dict(
         torch.load(model_path, map_location=torch.device("cpu"))
     )
 
     print("Checking Model Outputs ...")
-    example_data, print_text = check_outputs(
-        valid_dataloader, model, vocab_src, vocab_tgt, n_examples, 
-        model_path
-    )
+    results, print_text = check_outputs(valid_dataloader, model, vocab_src,
+                                        vocab_tgt, config["num_examples"], 
+                                        config)
+    bleu_score = Translate.compute_bleu(results)
+    print_text += (f'BLEU Score: {bleu_score:.4f}')
+    print(print_text)
 
-    save_translations(print_text, save_path=output_path)
-    return model, example_data
+    print("Saving Translations ...")
+    save_translations(print_text, 
+                      save_path=f"artifacts/generated_translations/"+
+                      f"N{config['N']}/epoch_{config['epoch']:02d}.png")
 
 def save_translations(print_text, save_path):
     """
@@ -115,24 +78,26 @@ def save_translations(print_text, save_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_epoch", type=int, default=1
+    parser.add_argument("--epoch", type=int, default=1
                         ) # 1-indexed epoch number of saved model
-    parser.add_argument("--model_save_name", type=str, 
-                        default="artifacts/saved_models/multi30k_model")
-    parser.add_argument("--output_save_name", type=str, 
-                        default="artifacts/generated_translations/translation")
+    parser.add_argument("--num_examples", type=int, default=5)
+    parser.add_argument("--N", type=int, default=None)
     args = parser.parse_args()
 
-    # get save path names
-    model_path = f"{args.model_save_name}_epoch_{args.model_epoch:02d}.pt"
-    output_path = f"{args.output_save_name}_epoch_{args.model_epoch:02d}.png"
+    # load training config file
+    with open('training/config.json', 'r') as fp:
+        config = json.load(fp)
+        config["epoch"] = args.epoch
+        config["num_examples"] = args.num_examples
+        if args.N: config['N'] = args.N
+
+    # create directories required for saving artifacts
+    SaveDirs.add_dir(f"generated_translations/N{config['N']}", include_base_path=True)
 
     # load vocabulary
-    tokenizer_src, tokenizer_tgt = build_tokenizers()
-    vocab_src, vocab_tgt = build_vocabularies(tokenizer_src, tokenizer_tgt)
+    tokenizer_src, tokenizer_tgt = build_tokenizers("de", "en")
+    vocab_src, vocab_tgt = build_vocabularies(tokenizer_src, tokenizer_tgt,
+                                              DataProcessor.get_raw_data(config["language_pair"]))
 
-    # create directory for saving translation results
-    SaveDirs.add_dir("generated_translations")
-
-    run_model_example(vocab_src, vocab_tgt, spacy_de, spacy_en, model_path, 
-                      output_path)
+    run_model_example(vocab_src, vocab_tgt, tokenizer_src, tokenizer_tgt,
+                      config)

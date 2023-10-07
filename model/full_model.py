@@ -13,7 +13,7 @@ class TransformerModel(nn.Module):
            tgt_vocab_size: number of tokens in decoder's embedding dictionary
            N: number of encoder/decoder layers
            d_model: embedding size
-           d_ff: feedfirward layer size
+           d_ff: feedforward layer size
            h: number of attention heads
         '''
         super(TransformerModel, self).__init__()
@@ -26,8 +26,9 @@ class TransformerModel(nn.Module):
         self.input_positional_enc_layer = PositionalEncodingLayer(d_model, dropout_prob)
         self.output_positional_enc_layer = PositionalEncodingLayer(d_model, dropout_prob)
 
-        # encoder-decoder
-        self.encoder_decoder = EncoderDecoder(h, d_model, d_ff, dropout_prob, N)
+        # encoder stack and decoder stack
+        self.encoder_stack = EncoderStack(h, d_model, d_ff, dropout_prob, N)
+        self.decoder_stack = DecoderStack(h, d_model, d_ff, dropout_prob, N)
 
         # linear and softmax layers
         self.linear_softmax_layers = LinearSoftmaxLayer(d_model, tgt_vocab_size)
@@ -40,36 +41,27 @@ class TransformerModel(nn.Module):
 
     def encode(self, src):
         # embed and add positional encoding
-        # print(f'src: {src.shape}')
-        input_embeddings = self.input_embedding_layer(src)
-        # print(f'input_embeddings: {input_embeddings.shape}')
-        input_embeddings_with_positions = self.input_positional_enc_layer(input_embeddings)
-        # print(f'input_embeddings_with_positions: {input_embeddings_with_positions.shape}')
+        src_embeddings = self.input_embedding_layer(src)
+        src_embeddings_with_positions = self.input_positional_enc_layer(src_embeddings)
         # encode
-        encoder_stack_output = self.encoder_decoder.encoder_stack(input_embeddings_with_positions)
-        # print(f'encoder_stack_output: {encoder_stack_output.shape}')
+        encoder_stack_output = self.encoder_stack(src_embeddings_with_positions)
         return encoder_stack_output
 
     def decode(self, tgt, memory, decoder_attn_mask):
         # embed and add positional encoding
-        # print(f'tgt: {tgt.shape}')
-        output_embeddings = self.output_embedding_layer(tgt)
-        # print(f'output_embeddings: {output_embeddings.shape}')
-        output_embeddings_with_positions = self.output_positional_enc_layer(output_embeddings)
-        # print(f'output_embeddings_with_positions: {output_embeddings_with_positions.shape}')
+        tgt_embeddings = self.output_embedding_layer(tgt)
+        tgt_embeddings_with_positions = self.output_positional_enc_layer(tgt_embeddings)
         # decode
-        decoder_stack_output = self.encoder_decoder.decoder_stack(output_embeddings_with_positions, memory, decoder_attn_mask)
-        # print(f'decoder_stack_output: {decoder_stack_output.shape}')
+        decoder_stack_output = self.decoder_stack(tgt_embeddings_with_positions, memory, decoder_attn_mask)
         return decoder_stack_output
 
     def forward(self, src, tgt, decoder_attn_mask):
         encoder_stack_output = self.encode(src)
         decoder_stack_output = self.decode(tgt, encoder_stack_output, decoder_attn_mask)
         output_probabilities = self.linear_softmax_layers(decoder_stack_output)
-        # print(f'linear_softmax_layers_output ie. output_probabilities: {output_probabilities.shape}')
-        # print('-'*60)
-        # print('\n')
         return output_probabilities
+    
+    
 
 
 class EmbeddingLayer(nn.Module): # TODO nn.Embedding from nn.Module
@@ -109,7 +101,7 @@ class PositionalEncodingLayer(nn.Module):
         x_with_position = x + self.pe[:, : x.size(1)].requires_grad_(False)
         return self.dropout_layer(x_with_position)
 
-
+# TODO: remove this class
 class EncoderDecoder(nn.Module):
     """
     A standard baseline Encoder-Decoder architecture. Base for this and many
@@ -172,10 +164,6 @@ class DecoderStack(nn.Module):
 
     def forward(self, x, memory, decoder_attn_mask):
         layer_input = x
-        # print('*'*60)
-        # print(f"layer_input in decoder stack {layer_input.shape}")
-        # print(f"decoder_attn_mask in decoder stack {decoder_attn_mask.shape}")
-        # print('*'*60)
         for layer in self.decoder_layers:
             # compute layer output
             layer_output = layer(layer_input, memory, decoder_attn_mask)
@@ -336,11 +324,10 @@ class MultiHeadedAttention(nn.Module):
         Take in model size and number of heads.
         """
         super().__init__()
-        # @?? ensure dimensionality of model ie. output of multihead attention
-        # matches number of heads * individual attention head dimension
+        # Model dimension must be multiple of number of heads
         assert d_model % h == 0, f'dimension mismatch, d_model must be a multiple of h (got {d_model} and {h})'
         self.h = h # number of heads
-        self.d_k = d_model // h # assume size_key = size_val
+        self.d_k = d_model // h # assume key size = value size
 
         # create linear layers for weights corresponding to q, k, v
         self.w_q = nn.Linear(d_model, d_model)
@@ -350,7 +337,8 @@ class MultiHeadedAttention(nn.Module):
         self.dropout_layer = nn.Dropout(p=dropout)
 
     def forward(self, query, key, value, attention_mask=None):
-        # TODO: explain what is this doing
+        # The attention mask is not used in the encoder, and hence is only
+        # assigned a null value for the encoder
         if attention_mask is not None:
             attention_mask_tensor = attention_mask.unsqueeze(1)
         else:
@@ -358,12 +346,13 @@ class MultiHeadedAttention(nn.Module):
 
         batch_size = query.size(0)
 
-        # TODO: comment here what we are doing, explain reshaping operations
-        # reshape outputs to @@@ shape (TODO)
-        reshape_fn = lambda x : x.view(batch_size, -1, self.h, self.d_k).transpose(1, 2)
-        derived_queries = reshape_fn(self.w_q(query))
-        derived_keys = reshape_fn(self.w_k(key))
-        derived_values = reshape_fn(self.w_v(value))
+        # The w_q, w_k, w_v matrices compute the size d_k derived query/key/value
+        # vectors for all h attention heads in one operation. We then 
+        # partition this into separate vectors for each attention head.
+        partition_across_attn_heads = lambda x : x.view(batch_size, -1, self.h, self.d_k).transpose(1, 2)
+        derived_queries = partition_across_attn_heads(self.w_q(query))
+        derived_keys = partition_across_attn_heads(self.w_k(key))
+        derived_values = partition_across_attn_heads(self.w_v(value))
         
         # compute attention
         attention_outputs, attention_weightings = \
@@ -371,31 +360,10 @@ class MultiHeadedAttention(nn.Module):
                          attention_mask_tensor, dropout=self.dropout_layer)
         # save weightings for visualization
         self.attention_weightings = attention_weightings
-        # reshape attention outputs to @@@ (TODO)
-        reshaped_attention_outputs = attention_outputs.transpose(1, 2).contiguous().view(batch_size, -1, self.h * self.d_k)
+        # concatenate outputs of the h attention heads into one vector
+        concatenated_attention_outputs = attention_outputs.transpose(1, 2).contiguous().view(batch_size, -1, self.h * self.d_k)
         # pass through final linear layer
-        result = self.linear_layer(reshaped_attention_outputs)
-        
-
-        # if attention_mask is not None:
-            # print("*"*60)
-            # print(f'attention_mask: {attention_mask.shape}')
-            # print(f'attention_mask_tensor: {attention_mask_tensor.shape}')
-        
-            # print(f'query: {query.shape}')
-            # print(f'key: {key.shape}')
-            # print(f'value: {value.shape}')
-
-            # print(f'derived_queries: {derived_queries.shape}')
-            # print(f'derived_keys: {derived_keys.shape}')
-            # print(f'derived_values: {derived_values.shape}')
-
-            # print(f'attention_outputs: {attention_outputs.shape}')
-            # print(f'attention_weightings: {attention_weightings.shape}')
-
-            # print(f'reshaped_attention_outputs: {reshaped_attention_outputs.shape}')
-
-            # print(f'result: {result.shape}')
+        result = self.linear_layer(concatenated_attention_outputs)
 
         del query, key, value, derived_queries, derived_keys, derived_values
         
