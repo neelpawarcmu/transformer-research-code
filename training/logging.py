@@ -23,9 +23,10 @@ class DirectoryCreator:
             cls.add_dir(dir, include_base_path=True)
             
 class TrainingLogger:
-    def __init__(self, N):
+    def __init__(self, N, batch_size):
         self.metrics = defaultdict(list)
         self.N = N
+        self.bs = batch_size
 
     def log(self, name, value):
         '''
@@ -37,7 +38,6 @@ class TrainingLogger:
         '''
         Plots and saves the metric history for specified list of metrics.
         '''
-        plt.figure(dpi=300)
         for name in names:
             label = name.replace('_',' ').capitalize()
             plt.plot(self.metrics[name], label=label)
@@ -50,7 +50,7 @@ class TrainingLogger:
         # whole number ticks
         plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
         # save plot
-        save_path = f"artifacts/loss_curves/N{self.N}/{title.lower()}.png"
+        save_path = f"artifacts/loss_curves/N{self.N}/{title.lower()} bs_{self.batch_size}.png"
         plt.savefig(save_path)
 
 class TranslationLogger:
@@ -89,7 +89,8 @@ class TranslationLogger:
         
         # print and save as plot
         print(print_text)
-        save_path = (base_path + f"N{self.N}/epoch_{self.epoch:02d}.png")
+        save_path = (base_path + 
+                     f"N{self.N}/epoch_{self.epoch:02d}.png")
         plt.figure()
         plt.text(0, 1, print_text)
         plt.axis('off')

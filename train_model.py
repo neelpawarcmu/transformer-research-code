@@ -59,7 +59,7 @@ def train(train_dataloader, val_dataloader, model, criterion,
           optimizer, scheduler, config):
     
     # initiate logger for saving metrics
-    logger = TrainingLogger(N=config["N"])
+    logger = TrainingLogger(config["N"], config["batch_size"])
     # start training
     for epoch in range(1, config["num_epochs"]+1): # epochs are 1-indexed
         # initialize timer

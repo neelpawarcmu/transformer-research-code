@@ -29,9 +29,10 @@ class Translator:
         '''
         with open(filepath, 'r') as fp:
             config = json.load(fp)
-            config["epoch"] = args.epoch
-            config["num_examples"] = args.num_examples
-            config["N"] = args.N
+        # add information from args
+        config["epoch"] = args.epoch
+        config["num_examples"] = args.num_examples
+        config["N"] = args.N
         self.config = config
 
     def prepare_vocabs(self): 
@@ -93,81 +94,6 @@ class Translator:
             logger.log('Predicted sentence (Model output)', pred_sentence)
 
 
-def check_outputs(valid_dataloader, model, vocab_src, vocab_tgt, 
-                  num_examples, config):
-    results = [()] * num_examples
-    print_text = ""
-    print_text += f"Transformer layers: {config['N']} | Epoch: {config['epoch']}\n\n"
-    model.eval() 
-
-    for idx, batch in list(enumerate(valid_dataloader))[:num_examples]:
-        pred_tokens_greedy = greedy_decode(model, batch, vocab_tgt)
-        pred_tokens_probabilistic = probabilistic_decode(model, batch, vocab_tgt)
-        src_sentence = SentenceProcessor.tokens_to_sentence(batch.src[0], vocab_src)
-        tgt_sentence = SentenceProcessor.tokens_to_sentence(batch.tgt_shifted_right[0], vocab_tgt)
-        pred_sentence_greedy = SentenceProcessor.tokens_to_sentence(pred_tokens_greedy[0], vocab_tgt)
-        pred_sentence_probabilistic = SentenceProcessor.tokens_to_sentence(pred_tokens_probabilistic[0], vocab_tgt)
-        print_text += (
-            f"Example {idx+1} ========\n" + 
-            f"Source Text (Input): {src_sentence}\n" +
-            f"Target Text (Ground Truth): {tgt_sentence}\n" +
-            f"Model Output (Greedy): {pred_sentence_greedy}\n" + 
-            f"Model Output (Probab): {pred_sentence_probabilistic}\n\n"
-        )
-        results[idx] = (src_sentence, tgt_sentence, pred_sentence_greedy)
-    return results, print_text
-
-def run_model_example(vocab_src, vocab_tgt, tokenizer_src, tokenizer_tgt, 
-                      config):
-
-    print("Preparing Data ...")
-    
-    # load data
-    train_dataset, val_dataset, test_dataset = load_datasets(config["language_pair"],
-                                                             tokenizer_src, 
-                                                             tokenizer_tgt, 
-                                                             vocab_src,
-                                                             vocab_tgt,
-                                                             config["max_padding"],
-                                                             device=torch.device("cpu"),
-                                                             random_seed=4)
-
-    train_dataloader, val_dataloader, test_dataloader = load_dataloaders(train_dataset, 
-                                                                         val_dataset, 
-                                                                         test_dataset,
-                                                                         config["batch_size"],
-                                                                         shuffle=True)
-    
-    print("Loading Trained Model ...")
-    model = TransformerModel(vocab_src.length, vocab_tgt.length, N=config["N"])
-    # load saved model weights
-    model_path = f"{config['model_dir']}/N{config['N']}/epoch_{config['epoch']:02d}.pt"
-    model.load_state_dict(
-        torch.load(model_path, map_location=torch.device("cpu"))
-    )
-
-    print("Checking Model Outputs ...")
-    results, print_text = check_outputs(val_dataloader, model, vocab_src,
-                                        vocab_tgt, config["num_examples"], 
-                                        config)
-    bleu_score = BleuUtils.compute_bleu(results)
-    print_text += (f'BLEU Score: {bleu_score:.4f}')
-    print(print_text)
-
-    print("Saving Translations ...")
-    save_translations(print_text, 
-                      save_path=f"artifacts/generated_translations/"+
-                      f"N{config['N']}/epoch_{config['epoch']:02d}.png")
-
-def save_translations(print_text, save_path):
-    """
-    Save translation text as an image
-    """
-    plt.figure()
-    plt.text(0, 1, print_text)
-    plt.axis('off')
-    plt.savefig(save_path, bbox_inches='tight')
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--epoch", type=int, default=1
@@ -194,22 +120,3 @@ if __name__ == "__main__":
 
     # print and save translation results
     logger.print_and_save('artifacts/generated_translations/')
-
-    # # load training config file
-    # with open('artifacts/training_config.json', 'r') as fp:
-    #     config = json.load(fp)
-    #     config["epoch"] = args.epoch
-    #     config["num_examples"] = args.num_examples
-    #     if args.N: config['N'] = args.N
-
-    # # create directories required for saving artifacts
-    # DirectoryCreator.add_dir(f"generated_translations/N{config['N']}", include_base_path=True)
-    
-
-    # # load vocabulary
-    # # tokenizer_src, tokenizer_tgt = build_tokenizers(config['language_pair'])
-    # # vocab_src, vocab_tgt = load_vocabularies(tokenizer_src, tokenizer_tgt,
-    # #                                           DataProcessor.get_raw_data(config["language_pair"]))
-
-    # run_model_example(vocab_src, vocab_tgt, tokenizer_src, tokenizer_tgt,
-    #                   config)
