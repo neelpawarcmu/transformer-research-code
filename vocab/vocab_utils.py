@@ -33,7 +33,8 @@ class VocabularyBuilder:
 class SpacyTokenizer:
     def __init__(self, language):
         self.available_pipelines = {"en": "en_core_web_sm", 
-                                    "de": "de_core_news_sm"}
+                                    "de": "de_core_news_sm",
+                                    "ro": "ro_core_news_md"}
         self.language = language
         self.load_spacy_pipeline()
        
@@ -54,9 +55,9 @@ def build_tokenizers(language_pair):
     tokenizer_tgt = SpacyTokenizer(language_pair[1])
     return tokenizer_src, tokenizer_tgt
 
-def build_vocabularies(tokenizer_src, tokenizer_tgt, data):
+def load_vocabularies(tokenizer_src=None, tokenizer_tgt=None, data=None):
     """
-    Load vocabs if saved, else create and save them locally.
+    Loads vocabs if saved, else creates and saves them locally.
     """
     save_path = "artifacts/saved_vocab/vocabs.pt"
 

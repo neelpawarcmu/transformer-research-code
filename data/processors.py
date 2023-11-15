@@ -38,7 +38,7 @@ class SentenceProcessor:
         '''
         # get ids for beginning and end of sentence, and padding markers
         bos_id, eos_id, pad_id = vocab(["<s>", "</s>", "<blank>"])
-        # convert to list for further processing
+        # convert to list
         padded_token_ids = padded_token_ids_tensor.tolist()
         # remove padding
         unpadded_token_ids = [tok for tok in padded_token_ids if tok != pad_id]
@@ -55,6 +55,7 @@ class DataProcessor(SentenceProcessor):
     def __init__(self, tokenizer_src, tokenizer_tgt, vocab_src, vocab_tgt,
                  max_padding, language_pair):
         super().__init__()
+        # TODO: language_pair arg comes first for consistency
         self.tokenizer_src = tokenizer_src
         self.tokenizer_tgt = tokenizer_tgt
         self.vocab_src = vocab_src
@@ -115,7 +116,7 @@ class DataProcessor(SentenceProcessor):
     #        :meth:`<processors.DataProcessor.preprocess_data>`
     #     '''
     #     # get raw data
-    #     train_iter, valid_iter, test_iter = datasets.Multi30k(...)
+    #     train_iter, valid_iter, test_iter = datasets...(...)
     #     raw_data = train_iter + valid_iter + test_iter
     #     if option == 'raw':
     #         return raw_data
@@ -124,6 +125,7 @@ class DataProcessor(SentenceProcessor):
     @staticmethod
     def get_raw_data(language_pair):
         train_iter, valid_iter, test_iter = datasets.Multi30k(language_pair=language_pair) #TODO: leverage split argument
+        # train_iter, valid_iter, test_iter = datasets.IWSLT2017(language_pair=language_pair)
         raw_data = train_iter + valid_iter + test_iter
         return raw_data
     

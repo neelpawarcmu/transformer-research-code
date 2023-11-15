@@ -77,12 +77,12 @@ def load_datasets(language_pair, tokenizer_src, tokenizer_tgt, vocab_src,
     A utility function that sources the preprocessed data, calls a split on 
     it, generates runtime dataset splits for training, validation and testing.
     '''
-    data_processor = DataProcessor(language_pair,
-                                   tokenizer_src,
+    data_processor = DataProcessor(tokenizer_src,
                                    tokenizer_tgt,
                                    vocab_src,
                                    vocab_tgt,
-                                   max_padding)
+                                   max_padding,
+                                   language_pair)
     preprocd_data = data_processor.get_preprocessed_data()
     
     (preprocd_train_data, 

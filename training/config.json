@@ -1,1 +1,0 @@
-{"language_pair": ["de", "en"], "N": 1, "batch_size": 64, "d_model": 512, "d_ff": 2048, "h": 8, "dropout_prob": 0.1, "num_epochs": 3, "accum_iter": 10, "base_lr": 1.0, "max_padding": 20, "warmup": 3000, "model_dir": "artifacts/saved_models"}

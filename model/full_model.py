@@ -1,7 +1,6 @@
 import math
 import torch
 import torch.nn as nn
-from torch.nn.functional import log_softmax
 
 class TransformerModel(nn.Module):
     def __init__(self, src_vocab_size, tgt_vocab_size, N=6, d_model=512, d_ff=2048,
@@ -31,7 +30,7 @@ class TransformerModel(nn.Module):
         self.decoder_stack = DecoderStack(h, d_model, d_ff, dropout_prob, N)
 
         # linear and softmax layers
-        self.linear_softmax_layers = LinearSoftmaxLayer(d_model, tgt_vocab_size)
+        self.linear_and_softmax_layers = LinearAndSoftmaxLayers(d_model, tgt_vocab_size)
 
         # Initialize parameters with Glorot / fan_avg.
         # This was important according to the paper's code TODO: verify this from the code
@@ -56,13 +55,14 @@ class TransformerModel(nn.Module):
         return decoder_stack_output
 
     def forward(self, src, tgt, decoder_attn_mask):
+        # pass source tokens through encoder
         encoder_stack_output = self.encode(src)
+        # pass target tokens and encoder output through decoder
         decoder_stack_output = self.decode(tgt, encoder_stack_output, decoder_attn_mask)
-        output_probabilities = self.linear_softmax_layers(decoder_stack_output)
-        return output_probabilities
+        # project decoder output to transformer output size of probabilities
+        output_logprobabilities = self.linear_and_softmax_layers(decoder_stack_output)
+        return output_logprobabilities
     
-    
-
 
 class EmbeddingLayer(nn.Module): # TODO nn.Embedding from nn.Module
     def __init__(self, vocab, d_model):
@@ -100,20 +100,6 @@ class PositionalEncodingLayer(nn.Module):
     def forward(self, x):
         x_with_position = x + self.pe[:, : x.size(1)].requires_grad_(False)
         return self.dropout_layer(x_with_position)
-
-# TODO: remove this class
-class EncoderDecoder(nn.Module):
-    """
-    A standard baseline Encoder-Decoder architecture. Base for this and many
-    other models. At each step, model is auto regressive model, consuming
-    the previously generated symbols as additional input when generating
-    the next.
-    """
-
-    def __init__(self, h, d_model, d_ff, dropout_prob, N):
-        super(EncoderDecoder, self).__init__()
-        self.encoder_stack = EncoderStack(h, d_model, d_ff, dropout_prob, N)
-        self.decoder_stack = DecoderStack(h, d_model, d_ff, dropout_prob, N)
 
 
 class EncoderStack(nn.Module):
@@ -201,6 +187,7 @@ class Sublayer(nn.Module):
         residual_output = x + dropout_output
         return residual_output
 
+
 class LayerNorm(nn.Module):
     "Construct a layernorm module (See citation for details)."
 
@@ -227,7 +214,7 @@ class EncoderLayer(nn.Module):
 
         # Initialize self attention network
         # note that we save as class variable (self.) only for torch functionality
-        self.self_attn_module = MultiHeadedAttention(h, d_model, dropout_prob)
+        self.self_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob)
 
         # Create self attention sublayer:
         #   Create a closure with self attention module inside.
@@ -240,14 +227,14 @@ class EncoderLayer(nn.Module):
         self.self_attn_sublayer = Sublayer(tokenwise_self_attn_workhorse, d_model, dropout_prob)
 
         # create feedforward sublayer
-        pos_ff_workhorse = PositionwiseFeedForward(d_model, d_ff, dropout_prob)
+        pos_ff_workhorse = PositionwiseFeedForwardNetwork(d_model, d_ff, dropout_prob)
         self.pos_ff_sublayer = Sublayer(pos_ff_workhorse, d_model, dropout_prob)
 
     def forward(self, x):
         self_attn_sublayer_output = self.self_attn_sublayer(x)
         pos_ff_sublayer_output = self.pos_ff_sublayer(self_attn_sublayer_output)
-
         return pos_ff_sublayer_output
+
 
 class DecoderLayer(nn.Module):
     """
@@ -263,7 +250,7 @@ class DecoderLayer(nn.Module):
         #   Create a closure referencing a self attention layer.
         #   The self attention module of the decoder layer uses a mask
         #   to prevent positions from attending to subsequent positions.
-        self.self_attn_module = MultiHeadedAttention(h, d_model, dropout_prob)
+        self.self_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob)
         tokenwise_self_attn_workhorse = lambda x, mask: \
              self.self_attn_module(query =  x,
                                    key = x,
@@ -275,7 +262,7 @@ class DecoderLayer(nn.Module):
         #   Create a closure referencing a cross attention layer.
         #   "memory" indicates that decoder layer operates on the output embedding from the
         #   encoder stack as explained in section 3.2.3 of the paper.
-        self.cross_attn_module = MultiHeadedAttention(h, d_model, dropout_prob)
+        self.cross_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob)
         tokenwise_cross_attn_workhorse = lambda x, memory: \
              self.cross_attn_module(query =  x,
                                     key = memory,
@@ -283,7 +270,7 @@ class DecoderLayer(nn.Module):
         self.cross_attn_sublayer = Sublayer(tokenwise_cross_attn_workhorse, d_model, dropout_prob)
 
         # create feedforward sublayer
-        pos_ff_workhorse = PositionwiseFeedForward(d_model, d_ff, dropout_prob)
+        pos_ff_workhorse = PositionwiseFeedForwardNetwork(d_model, d_ff, dropout_prob)
         self.pos_ff_sublayer = Sublayer(pos_ff_workhorse, d_model, dropout_prob)
 
 
@@ -300,29 +287,15 @@ class DecoderLayer(nn.Module):
         return pos_ff_sublayer_output
 
 
-def attention_fn(derived_queries, derived_keys, derived_values, mask=None, dropout=None):
-    "Compute 'Scaled Dot Product Attention'"
-    # key size
-    d_k = derived_queries.size(-1)
-    # equation (1) of paper
-    scores = torch.matmul(derived_queries, derived_keys.transpose(-2, -1)) / math.sqrt(d_k)
-    if mask is not None:
-        scores = scores.masked_fill(mask == 0, -1e9)
-    attention_weightings = scores.softmax(dim=-1)
-    if dropout is not None:
-        attention_weightings = dropout(attention_weightings)
-    return torch.matmul(attention_weightings, derived_values), attention_weightings
-
-
-class MultiHeadedAttention(nn.Module):
+class MultiHeadedAttentionModule(nn.Module):
     """
     Generates a multiheaded attention network, which is 3 feedforward networks,
-    for linear transformation on the query, key and value.
+    for linear transformation on the query, key and value. These linearly 
+    transformed vectors are then passed to the attention function which 
+    performs scaled dot product attention on the vectors, returning the
+    attended vector.
     """
-    def __init__(self, h, d_model, dropout=0.1):
-        """
-        Take in model size and number of heads.
-        """
+    def __init__(self, h, d_model, dropout_prob=0.1):
         super().__init__()
         # Model dimension must be multiple of number of heads
         assert d_model % h == 0, f'dimension mismatch, d_model must be a multiple of h (got {d_model} and {h})'
@@ -334,7 +307,7 @@ class MultiHeadedAttention(nn.Module):
         self.w_k = nn.Linear(d_model, d_model)
         self.w_v = nn.Linear(d_model, d_model)
         self.linear_layer = nn.Linear(d_model, d_model)
-        self.dropout_layer = nn.Dropout(p=dropout)
+        self.dropout_layer = nn.Dropout(p=dropout_prob)
 
     def forward(self, query, key, value, attention_mask=None):
         # The attention mask is not used in the encoder, and hence is only
@@ -346,9 +319,10 @@ class MultiHeadedAttention(nn.Module):
 
         batch_size = query.size(0)
 
-        # The w_q, w_k, w_v matrices compute the size d_k derived query/key/value
+        # The w_q, w_k, w_v matrices compute the sized d_k derived query/key/value
         # vectors for all h attention heads in one operation. We then 
-        # partition this into separate vectors for each attention head.
+        # partition this into separate vectors for each attention head 
+        # (Paragraph 1, Section 3.2.2 of the paper).
         partition_across_attn_heads = lambda x : x.view(batch_size, -1, self.h, self.d_k).transpose(1, 2)
         derived_queries = partition_across_attn_heads(self.w_q(query))
         derived_keys = partition_across_attn_heads(self.w_k(key))
@@ -356,56 +330,85 @@ class MultiHeadedAttention(nn.Module):
         
         # compute attention
         attention_outputs, attention_weightings = \
-            attention_fn(derived_queries, derived_keys, derived_values,
-                         attention_mask_tensor, dropout=self.dropout_layer)
-        # save weightings for visualization
+            self.attention_fn(derived_queries, derived_keys, derived_values, 
+                              attention_mask_tensor)
+        # save weightings only for visualization
         self.attention_weightings = attention_weightings
         # concatenate outputs of the h attention heads into one vector
-        concatenated_attention_outputs = attention_outputs.transpose(1, 2).contiguous().view(batch_size, -1, self.h * self.d_k)
+        concatenated_attention_outputs = \
+            attention_outputs.transpose(1, 2).contiguous().view(batch_size, -1, self.h * self.d_k)
         # pass through final linear layer
         result = self.linear_layer(concatenated_attention_outputs)
 
         del query, key, value, derived_queries, derived_keys, derived_values
         
         return result
+    
+    def attention_fn(self, derived_queries, derived_keys, derived_values, 
+                     mask=None):
+        '''
+        Compute scaled dot product attention based on equation (1) under 
+        section 3.2.1 of the paper: Attention(Q, K, V) = Softmax(QK^T / √dk)V. 
+        Additional to this equation, dropout is applied (@dst.cs.cmu.edu). 
+        Steps:
+            1. Compute alignment scores, ie. dot product QK^T
+            2. Scale by square root of key size
+            3. Optionally apply masking if computing attention within the decoder
+            4. Apply dropout for regularization 
+            4. Apply softmax to get an attention matrix of weightings
+            5. Multiply attention matrix with values to get resulting attention outputs
+        '''
+        # key size
+        d_k = derived_queries.size(-1)
+        # equation (1) of paper
+        scores = torch.matmul(derived_queries, derived_keys.transpose(-2, -1)) / math.sqrt(d_k)
+        if mask is not None:
+            scores = scores.masked_fill(mask == 0, -1e9)
+        attention_weightings = scores.softmax(dim=-1)
+        # apply dropout
+        attention_weightings = self.dropout_layer(attention_weightings)
+        # compute attended 
+        attention_outputs = torch.matmul(attention_weightings, derived_values)
+        return attention_outputs, attention_weightings
 
 
-class PositionwiseFeedForward(nn.Module):
+class PositionwiseFeedForwardNetwork(nn.Module):
     """
-    Implements FFN equation.
-    args: d_model - dimensions
+    Implements a fully connected position-wise feed-forward network consisting 
+    of two linear layers with a ReLU in between them, as per equation (2) 
+    under section 3.3 of the paper. Applies dropout to the output of the 
+    first layer as per ?? (@dst.cs.cmu.edu) 
     """
 
     def __init__(self, d_model, d_ff, dropout_prob=0.1):
-        super(PositionwiseFeedForward, self).__init__()
-        self.linear_layer_1  =  nn.Linear(d_model, d_ff)
-        self.relu_1          =  nn.ReLU(inplace=True)
-        self.linear_layer_2  =  nn.Linear(d_ff, d_model)
-        self.dropout_layer   =  nn.Dropout(dropout_prob)
+        super(PositionwiseFeedForwardNetwork, self).__init__()
+        self.linear_layer_1 = nn.Linear(d_model, d_ff)
+        self.relu = nn.ReLU(inplace=True)
+        self.linear_layer_2 = nn.Linear(d_ff, d_model)
+        self.dropout_layer = nn.Dropout(dropout_prob)
 
     def forward(self, x):
-        '''
-        2 linear layers with relu activation (and dropout) in between
-        linear => relu => dropout => linear
-        '''
-        linear_1_out  =  self.linear_layer_1(x)
-        relu_1_out    =  self.relu_1(linear_1_out)
-        dropout_out   =  self.dropout_layer(relu_1_out)
-        linear_2_out  =  self.linear_layer_2(dropout_out)
-        return linear_2_out
+        linear_1_output = self.linear_layer_1(x)
+        relu_output = self.relu(linear_1_output)
+        dropout_output = self.dropout_layer(relu_output)
+        linear_2_output = self.linear_layer_2(dropout_output)
+        return linear_2_output
 
 
-class LinearSoftmaxLayer(nn.Module):
-    "Define standard linear + softmax generation step."
+class LinearAndSoftmaxLayers(nn.Module):
     """
-    1. projecting
-    2. generating probabilities
+    Define standard linear + softmax generation step.
+    1. project transformer output to target vocabulary size
+    2. generate output log probabilities for the entire vocab-sized vector, ie,
+       every token in the target vocabulary
     """
 
     def __init__(self, d_model, vocab_size):
-        super(LinearSoftmaxLayer, self).__init__()
-        self.proj = nn.Linear(d_model, vocab_size)
+        super(LinearAndSoftmaxLayers, self).__init__()
+        self.linear_layer = nn.Linear(d_model, vocab_size)
+        self.softmax_layer = nn.LogSoftmax(dim = -1) # Note use of log probabilities
 
     def forward(self, x):
-        return log_softmax(self.proj(x), dim=-1)
-
+        linear_layer_output = self.linear_layer(x)
+        softmax_layer_output = self.softmax_layer(linear_layer_output)
+        return softmax_layer_output

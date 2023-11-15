@@ -4,13 +4,14 @@ import json
 import torch
 from torch.optim.lr_scheduler import LambdaLR
 from model.full_model import TransformerModel
-from vocab.vocab_utils import build_tokenizers, build_vocabularies
+from vocab.vocab_utils import build_tokenizers, load_vocabularies
 from data.processors import DataProcessor
 from data.runtime_loaders import load_datasets, load_dataloaders
-from training.save_utils import SaveDirs
-from training.loss_utils import SimpleLossCompute, LabelSmoothing
-from training.loggers import Logger
-from inference.utils import Translate
+from training.logging import DirectoryCreator
+from training.loss import SimpleLossCompute, LabelSmoothing
+from training.logging import TrainingLogger
+from inference.utils import BleuUtils
+from types import SimpleNamespace
 
 def create_model(src_vocab_size: int,
                  tgt_vocab_size: int,
@@ -23,11 +24,13 @@ def create_model(src_vocab_size: int,
                              d_ff, h, dropout_prob)
     return model
 
-def create_config(args):
+def create_config(args, src_vocab_size, tgt_vocab_size):
     config = {
-        "language_pair": args.language_pair,
+        "src_vocab_size": src_vocab_size,
+        "tgt_vocab_size": tgt_vocab_size,
+        "language_pair": tuple(args.language_pair),
         "N": args.N,
-        "batch_size": 64,
+        "batch_size": args.batch_size,
         "d_model": 512,
         "d_ff": 2048,
         "h": 8,
@@ -40,7 +43,7 @@ def create_config(args):
         "model_dir": f"artifacts/saved_models",
     }
     # save config as a json file
-    with open('training/config.json', 'w') as fp:
+    with open('artifacts/training_config.json', 'w') as fp:
         json.dump(config, fp)
     return config
 
@@ -56,7 +59,8 @@ def train(train_dataloader, val_dataloader, model, criterion,
           optimizer, scheduler, config):
     
     # initiate logger for saving metrics
-    logger = Logger(N=config["N"])
+    logger = TrainingLogger(N=config["N"])
+    # start training
     for epoch in range(1, config["num_epochs"]+1): # epochs are 1-indexed
         # initialize timer
         start = time.time()
@@ -74,20 +78,23 @@ def train(train_dataloader, val_dataloader, model, criterion,
         # since validation is done at end of entire training epoch
         logger.log('train_loss', train_loss)
         logger.log('val_loss', val_loss)
+        logger.log('train_bleu', train_bleu)
+        logger.log('val_bleu', val_bleu)
 
         # print losses
         print(f"Epoch: {epoch} | "
-              f"Average training loss: {train_loss:.3f}, BLEU: {train_bleu:.3f} | "
-              f"Average validation loss: {val_loss:.3f}, BLEU: {val_bleu:.3f} | "
+              f"Training: Loss: {train_loss:.3f}, BLEU: {train_bleu:.3f} | "
+              f"Validation: Loss: {val_loss:.3f}, BLEU: {val_bleu:.3f} | "
               f"Time taken: {1/60*(time.time() - start):.2f} min")
-        print("="*80)
+        print("="*100)
 
         # save model
         torch.save(model.state_dict(),
                    f'{config["model_dir"]}/N{config["N"]}/epoch_{epoch:02d}.pt')
 
     # plot and save loss curves
-    # logger.plot()
+    logger.saveplot(['train_loss', 'val_loss'], 'Losses')
+    logger.saveplot(['train_bleu', 'val_bleu'], 'BLEU scores')
 
 def run_train_epoch(train_dataloader, model, criterion, optimizer, 
                     scheduler, accum_iter):
@@ -96,14 +103,14 @@ def run_train_epoch(train_dataloader, model, criterion, optimizer,
     # iterate over the training data and compute losses
     total_loss, total_bleu = 0, 0
     for i, batch in enumerate(train_dataloader):
-        output_probabilities = model.forward(batch.src, 
+        output_logprobabilities = model.forward(batch.src, 
                                              batch.tgt_shifted_right,
                                              batch.decoder_attn_mask)
         # compute loss and BLEU score
-        loss = criterion(output_probabilities, batch.tgt_label, batch.ntokens)
-        # TODO: passing global variable for 'translate' below should be resolved
-        batch.predictions = torch.argmax(output_probabilities, dim=2)   
-        bleu = translate.compute_batch_bleu(batch)
+        loss = criterion(output_logprobabilities, batch.tgt_label, batch.ntokens)
+        batch.predictions = torch.argmax(output_logprobabilities, dim=2)   
+        # TODO: passing global variable for 'bleu_utils' below should be resolved
+        bleu = bleu_utils.compute_batch_bleu(batch)
         # backpropagate and apply optimizer-based gradient descent 
         loss.backward()
         if i % accum_iter == 0:
@@ -132,13 +139,13 @@ def run_val_epoch(val_dataloader, model, criterion):
     # iterate over the validation data and compute losses
     total_loss, total_bleu = 0, 0
     for batch in val_dataloader:
-        output_probabilities = model.forward(batch.src, batch.tgt_shifted_right, 
+        output_logprobabilities = model.forward(batch.src, batch.tgt_shifted_right, 
                                              batch.decoder_attn_mask)
         # compute loss and BLEU score
-        loss = criterion(output_probabilities, batch.tgt_label, batch.ntokens)
-        # TODO: passing global variable for 'translate' here should be resolved
-        batch.predictions = torch.argmax(output_probabilities, dim=2)   
-        bleu = translate.compute_batch_bleu(batch)
+        loss = criterion(output_logprobabilities, batch.tgt_label, batch.ntokens)
+        # TODO: passing global variable for 'bleu_utils' here should be resolved
+        batch.predictions = torch.argmax(output_logprobabilities, dim=2)   
+        bleu = bleu_utils.compute_batch_bleu(batch)
         # accumulate loss and BLEU score
         total_loss += loss.detach().cpu().numpy()
         total_bleu += bleu
@@ -152,24 +159,31 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--N", type=int, default=6)
+    # parser.add_argument("--language_pair", type=str, nargs="+", default=("de", "en"))
     parser.add_argument("--language_pair", type=tuple, default=("de", "en"))
+    parser.add_argument("--batch_size", type=int, default=64)
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # create configuration for training
-    config = create_config(args)
-
-    # create if missing, directories required for saving artifacts
-    SaveDirs.create_dirs(['saved_vocab', 'saved_data', 
-                          f'saved_models/N{args.N}', f'loss_curves/N{args.N}'])
+    # if missing, create directories required for saving artifacts
+    DirectoryCreator.create_dirs(['saved_vocab', 
+                                  'saved_data',
+                                  f'saved_models/N{args.N}', 
+                                  f'loss_curves/N{args.N}'])
 
     # load tokenizers and vocabulary
-    tokenizer_src, tokenizer_tgt = build_tokenizers(config["language_pair"])
-    vocab_src, vocab_tgt = build_vocabularies(tokenizer_src, tokenizer_tgt,
-                                              data = DataProcessor.get_raw_data(config["language_pair"]))
+    tokenizer_src, tokenizer_tgt = build_tokenizers(args.language_pair)
+    vocab_src, vocab_tgt = load_vocabularies(tokenizer_src, tokenizer_tgt,
+                                             data = DataProcessor.get_raw_data(
+                                                 args.language_pair))
+
+    # create configuration for training
+    config = create_config(args, vocab_src.length, vocab_tgt.length)
 
     # initialize model
-    model = create_model(vocab_src.length, vocab_tgt.length, config["N"])
+    model = create_model(config["src_vocab_size"], config["tgt_vocab_size"],
+                         config["N"], config["d_model"], config["d_ff"],
+                         config["h"], config["dropout_prob"])
     model = model.to(device)
     
     # load data
@@ -182,11 +196,11 @@ if __name__ == "__main__":
                                                              device=device,
                                                              random_seed=4)
 
-    train_dataloader, val_dataloader, _ = load_dataloaders(train_dataset, 
-                                                           val_dataset, 
-                                                           test_dataset,
-                                                           config["batch_size"],
-                                                           shuffle=True)
+    train_dataloader, val_dataloader, test_dataloader = load_dataloaders(train_dataset, 
+                                                                         val_dataset, 
+                                                                         test_dataset,
+                                                                         config["batch_size"],
+                                                                         shuffle=True)
     
     # create loss criterion, learning rate optimizer and scheduler
     label_smoothing = LabelSmoothing(vocab_tgt.length, vocab_tgt["<blank>"], 0.1)
@@ -200,7 +214,7 @@ if __name__ == "__main__":
                          warmup=config["warmup"]))
     
     # initialize translation utils TODO: check if this needs to go somewhere else / needs refactoring
-    translate = Translate(vocab_src, vocab_tgt)
+    bleu_utils = BleuUtils(vocab_src, vocab_tgt)
 
     # train
     train(train_dataloader, val_dataloader, model, criterion, optimizer, scheduler, config)
