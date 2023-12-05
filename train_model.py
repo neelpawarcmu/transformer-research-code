@@ -5,6 +5,7 @@ import torch
 from torch.optim.lr_scheduler import LambdaLR
 from model.full_model import TransformerModel
 from vocab.vocab_utils import build_tokenizers, load_vocabularies
+from data.download import DataDownloader
 from data.processors import DataProcessor
 from data.runtime_loaders import load_datasets, load_dataloaders
 from training.logging import DirectoryCreator
@@ -28,6 +29,7 @@ def create_config(args, src_vocab_size, tgt_vocab_size):
     config = {
         "src_vocab_size": src_vocab_size,
         "tgt_vocab_size": tgt_vocab_size,
+        "dataset_name": args.dataset_name,
         "language_pair": tuple(args.language_pair),
         "N": args.N,
         "batch_size": args.batch_size,
@@ -38,7 +40,7 @@ def create_config(args, src_vocab_size, tgt_vocab_size):
         "num_epochs": args.epochs,
         "accum_iter": 10,
         "base_lr": 1.0,
-        "max_padding": 20,
+        "max_padding": args.max_padding,
         "warmup": 3000,
         "model_dir": f"artifacts/saved_models",
     }
@@ -59,7 +61,7 @@ def train(train_dataloader, val_dataloader, model, criterion,
           optimizer, scheduler, config):
     
     # initiate logger for saving metrics
-    logger = TrainingLogger(config["N"], config["batch_size"])
+    logger = TrainingLogger()
     # start training
     for epoch in range(1, config["num_epochs"]+1): # epochs are 1-indexed
         # initialize timer
@@ -93,8 +95,18 @@ def train(train_dataloader, val_dataloader, model, criterion,
                    f'{config["model_dir"]}/N{config["N"]}/epoch_{epoch:02d}.pt')
 
     # plot and save loss curves
-    logger.saveplot(['train_loss', 'val_loss'], 'Losses')
-    logger.saveplot(['train_bleu', 'val_bleu'], 'BLEU scores')
+    logger.saveplot(
+        metric_names=['train_loss', 'val_loss'], 
+        title='Losses',
+        title_dict={k:config[k] for k in ['batch_size', 'N']}, 
+        plot_type='loss',
+    )
+    logger.saveplot(
+        metric_names=['train_bleu', 'val_bleu'], 
+        title='BLEU scores',
+        title_dict={k:config[k] for k in ['batch_size', 'N']}, 
+        plot_type='bleu',
+    )
 
 def run_train_epoch(train_dataloader, model, criterion, optimizer, 
                     scheduler, accum_iter):
@@ -159,9 +171,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--N", type=int, default=6)
-    # parser.add_argument("--language_pair", type=str, nargs="+", default=("de", "en"))
     parser.add_argument("--language_pair", type=tuple, default=("de", "en"))
     parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--max_padding", type=int, default=20)
+    parser.add_argument("--dataset_name", type=str, choices=["wmt14", "m30k"])
+    parser.add_argument("--cache", type=bool, default=True)
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -174,8 +188,12 @@ if __name__ == "__main__":
     # load tokenizers and vocabulary
     tokenizer_src, tokenizer_tgt = build_tokenizers(args.language_pair)
     vocab_src, vocab_tgt = load_vocabularies(tokenizer_src, tokenizer_tgt,
-                                             data = DataProcessor.get_raw_data(
-                                                 args.language_pair))
+                                             data=DataDownloader.get_data(
+                                                 args.dataset_name,
+                                                 args.language_pair,
+                                                 cache=args.cache,
+                                                 preprocess=False),
+                                             cache=args.cache)
 
     # create configuration for training
     config = create_config(args, vocab_src.length, vocab_tgt.length)
@@ -187,13 +205,15 @@ if __name__ == "__main__":
     model = model.to(device)
     
     # load data
-    train_dataset, val_dataset, test_dataset = load_datasets(config["language_pair"],
+    train_dataset, val_dataset, test_dataset = load_datasets(config["dataset_name"],
+                                                             config["language_pair"],
                                                              tokenizer_src, 
                                                              tokenizer_tgt, 
                                                              vocab_src,
                                                              vocab_tgt,
                                                              config["max_padding"],
                                                              device=device,
+                                                             cache=args.cache,
                                                              random_seed=4)
 
     train_dataloader, val_dataloader, test_dataloader = load_dataloaders(train_dataset, 

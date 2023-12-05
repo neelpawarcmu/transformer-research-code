@@ -23,10 +23,8 @@ class DirectoryCreator:
             cls.add_dir(dir, include_base_path=True)
             
 class TrainingLogger:
-    def __init__(self, N, batch_size):
+    def __init__(self):
         self.metrics = defaultdict(list)
-        self.N = N
-        self.bs = batch_size
 
     def log(self, name, value):
         '''
@@ -34,32 +32,52 @@ class TrainingLogger:
         '''
         self.metrics[name].append(value)
 
-    def saveplot(self, names: list, title):
+    def saveplot(self, metric_names, title, title_dict, plot_type):
         '''
         Plots and saves the metric history for specified list of metrics.
         '''
-        for name in names:
+
+        # compute plot limits
+        if plot_type == 'loss':
+            ylim = (0, 8)
+        elif plot_type == 'bleu':
+            ylim = (0, 1)
+        else: 
+            raise ValueError(f"Invalid plot_type '{plot_type}'")
+        
+        composed_title = (" | ").join(
+            [title] + 
+            [f"{k.replace('_', ' ').capitalize()}: {v}" 
+             for k, v in title_dict.items()]
+        )
+        
+        plt.figure()
+        for name in metric_names:
             label = name.replace('_',' ').capitalize()
-            plt.plot(self.metrics[name], label=label)
+            metric_history = self.metrics[name]
+            plt.ylim(*ylim)
+            plt.xlim(1, len(metric_history))
+            plt.plot(range(1, len(metric_history)+1), metric_history, label=label)
         plt.xlabel("Epoch")
         plt.ylabel("Metric")
-        plt.title(title)
+        plt.title(composed_title)
         plt.grid(visible=True)
         plt.autoscale(False)
         plt.legend()
         # whole number ticks
         plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
         # save plot
-        save_path = f"artifacts/loss_curves/N{self.N}/{title.lower()} bs_{self.batch_size}.png"
+        save_path = (f"artifacts/loss_curves/"
+                     f"N{title_dict['N']}/{title.lower().replace(' ', '_')}"
+                     f"_bs_{title_dict['batch_size']}.png")
+        plt.show()
+        plt.pause(0.01)
         plt.savefig(save_path)
 
 class TranslationLogger:
-    def __init__(self, N, epoch, num_examples):
+    def __init__(self):
         self.sentences = defaultdict(list)
         self.metrics = defaultdict(float)
-        self.N = N
-        self.epoch = epoch
-        self.num_examples = num_examples
 
     def log(self, name, value):
         '''
@@ -71,15 +89,23 @@ class TranslationLogger:
         '''
         Logs numerical metrics like BLEU score of the entire data.
         '''
-        self.sentences[name] = value
+        self.metrics[name] = value
 
-    def print_and_save(self, base_path):
+    def print_and_save(self, base_path, title, title_dict):
         '''
-        Prints translations and corresponding metrics and saves them as a plot.
+        Prints translations and corresponding metrics and saves them as an image.
         '''
-        # Generate pretty print of translated text
-        print_text = f"Transformer layers: {self.N} | Epoch: {self.epoch}\n"
-        for i in range(self.num_examples):
+        # Compose a title for the image
+        composed_title = (" | ").join(
+            [title] + 
+            [f"{k.replace('_', ' ').capitalize()}: {v}" 
+             for k, v in title_dict.items()]
+        )
+        # Start composing pretty print of translated text
+        print_text = f"{composed_title}\n"
+        # get number of examples
+        num_examples = len(list(self.sentences.values())[0])
+        for i in range(num_examples):
             print_text += f'\nExample {i+1}:\n' 
             for name in self.sentences:
                 print_text += f'{name}: {self.sentences[name][i]}\n'
@@ -87,10 +113,10 @@ class TranslationLogger:
         for name in self.metrics:
             print_text += f'\n{name}: {self.metrics[name]:.4f}'
         
-        # print and save as plot
+        # print and save as image
         print(print_text)
         save_path = (base_path + 
-                     f"N{self.N}/epoch_{self.epoch:02d}.png")
+                     f"N{title_dict['N']}/epoch_{title_dict['epoch']:02d}.png")
         plt.figure()
         plt.text(0, 1, print_text)
         plt.axis('off')

@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
+from data.download import DataDownloader
 from data.processors import DataProcessor
 
 # "Batching"
@@ -71,19 +72,24 @@ class RuntimeDataset(torch.utils.data.Dataset):
         return Batch(batch_src, batch_tgt)
     
         
-def load_datasets(language_pair, tokenizer_src, tokenizer_tgt, vocab_src, 
-                  vocab_tgt, max_padding, device, random_seed=None):
+def load_datasets(name, language_pair, tokenizer_src, tokenizer_tgt, vocab_src, 
+                  vocab_tgt, max_padding, device, cache, random_seed=None):
     '''
     A utility function that sources the preprocessed data, calls a split on 
     it, generates runtime dataset splits for training, validation and testing.
     '''
+    print(f'loading dataset {name}')
     data_processor = DataProcessor(tokenizer_src,
                                    tokenizer_tgt,
                                    vocab_src,
                                    vocab_tgt,
                                    max_padding,
                                    language_pair)
-    preprocd_data = data_processor.get_preprocessed_data()
+    preprocd_data = DataDownloader.get_data(name=name, 
+                                            language_pair=language_pair, 
+                                            cache=cache, 
+                                            preprocess=True, 
+                                            preprocessor=data_processor)
     
     (preprocd_train_data, 
      preprocd_val_data, 
@@ -94,6 +100,11 @@ def load_datasets(language_pair, tokenizer_src, tokenizer_tgt, vocab_src,
     train_dataset = RuntimeDataset(preprocd_train_data, device)
     val_dataset = RuntimeDataset(preprocd_val_data, device)
     test_dataset = RuntimeDataset(preprocd_test_data, device)
+
+    print(f"Number of sentence pairs: \n"
+          f"Training: {train_dataset.length}\t"
+          f"Validation: {val_dataset.length}\t"
+          f"Test: {test_dataset.length}\t")
 
     return train_dataset, val_dataset, test_dataset
 
@@ -115,7 +126,7 @@ def load_dataloaders(train_dataset, val_dataset, test_dataset,
                                 shuffle=shuffle,
                                 collate_fn=val_dataset.collate_fn)
     
-    test_dataloader = DataLoader(dataset=val_dataset, 
+    test_dataloader = DataLoader(dataset=test_dataset, 
                                 batch_size=batch_size, 
                                 shuffle=shuffle,
                                 collate_fn=val_dataset.collate_fn)

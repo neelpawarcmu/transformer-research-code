@@ -1,8 +1,6 @@
-import os
 import torch
 from tqdm import tqdm
 from torch.nn.functional import pad
-import torchtext.datasets as datasets
 from sklearn.model_selection import train_test_split
 from torchtext.data.functional import to_map_style_dataset
 
@@ -89,52 +87,53 @@ class DataProcessor(SentenceProcessor):
         
         return preprocessed_dataset
     
-    def get_preprocessed_data(self):
-        '''
-        Load the preprocessed data if saved, else download and 
-        preprocess data
-        '''
-        save_path = "artifacts/saved_data/preprocd_data.pt"
-        if os.path.exists(save_path):
-            preprocd_data = torch.load(save_path)
-        else:
-            raw_data = self.get_raw_data(self.language_pair)
-            preprocd_data = self.preprocess_data(raw_data)
-            torch.save(preprocd_data, save_path)
-        return preprocd_data
-        
-    # TODO: make this the standard function
-    # def get_data(self, option):
+    # def get_data(self, name, language_pair, preprocess, cache):
     #     '''
-    #     Gets data from the Pytorch Multi30k dataset. Takes two options, 'raw'
-    #     and 'preprocessed' and returns a dataset in the corresponding format:
-    #     - 'raw': iterator of 2-tuples, each containing a source sentence and 
-    #        a target sentence in string format
+    #     Gets data from the Pytorch Multi30k dataset. Returns data in one of two
+    #     formats, 'raw' or 'preprocessed':
+    #     - 'raw': iterator of length num_sentences and containing 2-tuples, 
+    #        each containing a source sentence and a target sentence as strings
     #     - 'preprocessed': tensor of shape [num_sentences, max_sentence_length, 2]
     #        where 2 denotes source and target language sentences. Note that the 
     #        sentences are preprocessed and tokenized as described under 
     #        :meth:`<processors.DataProcessor.preprocess_data>`
+    #     Args: 
+    #     name: Name of dataset, options: ['wmt14', 'm30k']
     #     '''
-    #     # get raw data
-    #     train_iter, valid_iter, test_iter = datasets...(...)
-    #     raw_data = train_iter + valid_iter + test_iter
-    #     if option == 'raw':
-    #         return raw_data
-    #     elif option == 'preprocessed':
+    #     # conditionally return saved data directly
+    #     cache_path = "artifacts/saved_data/preprocd_data.pt"
+    #     if (preprocess and cache and op.exists(cache_path)):
+    #         preprocessed_data = torch.load(cache_path)
+    #         print(f"Loaded data from {cache_path}")
+    #         return preprocessed_data
 
-    @staticmethod
-    def get_raw_data(language_pair):
-        train_iter, valid_iter, test_iter = datasets.Multi30k(language_pair=language_pair) #TODO: leverage split argument
-        # train_iter, valid_iter, test_iter = datasets.IWSLT2017(language_pair=language_pair)
-        raw_data = train_iter + valid_iter + test_iter
-        return raw_data
+    #     # get raw data
+    #     if name == 'wmt14':
+    #         dataset_dict = load_dataset("wmt14", "-".join(language_pair))
+    #         train, val, test = (dataset_dict['train']['translation'], 
+    #                             dataset_dict['validation']['translation'], 
+    #                             dataset_dict['test']['translation'])
+    #         raw_data = [tuple(sentence_pair.values()) for sentence_pair in train + val + test][:1000]
+    #     elif name == 'm30k':
+    #         train_iter, valid_iter, test_iter = datasets.Multi30k(language_pair=language_pair) 
+    #         raw_data = train_iter + valid_iter + test_iter
+    #     else: 
+    #         raise ValueError(f"Received {name}, available datasets 'wmt14' and 'm30k'")
+        
+    #     # preprocess and save if needed
+    #     if preprocess:
+    #         preprocessed_data = self.preprocess_data(raw_data)
+    #         torch.save(preprocessed_data, cache_path) 
+    #         return preprocessed_data
+    #     else:
+    #         return raw_data
     
     @staticmethod
     def get_data_splits(data, split_ratio=(0.8, 0.1, 0.1), random_seed=None):
         '''
         Splits a given dataset into train, validation and test sets as
         determined by the specified split ratio
-        TODO: deprecate this if split is done in get_raw_data
+        TODO: deprecate this if split is done in get_data
         '''
         train_size, val_size, test_size = split_ratio
         train_data, val_and_test_data = train_test_split(
