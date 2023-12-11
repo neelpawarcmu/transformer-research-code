@@ -3,16 +3,6 @@ import os.path as op
 import torchtext.datasets as datasets
 from datasets import load_dataset # TODO: move to download.py
 
-# class DataDownloader:
-#     def __init__(self, name, language_pair):
-#         self.name = name
-#         if name == "wmt14":
-#             train, val, test = load_dataset(name, language_pair)
-
-#     def get_raw_data(self):
-#         if self.name == "wmt14":
-#             train, val, test = None # TODO
-
 class DataDownloader:
     @staticmethod
     def get_data(name, language_pair, cache, preprocess, preprocessor=None):
@@ -41,7 +31,7 @@ class DataDownloader:
             train, val, test = (dataset_dict['train']['translation'], 
                                 dataset_dict['validation']['translation'], 
                                 dataset_dict['test']['translation'])
-            raw_data = [tuple(sentence_pair.values()) for sentence_pair in train + val + test][:2000]
+            raw_data = [tuple(sentence_pair.values()) for sentence_pair in train + val + test]
         elif name == 'm30k':
             train_iter, valid_iter, test_iter = datasets.Multi30k(language_pair=language_pair) 
             raw_data = train_iter + valid_iter + test_iter

@@ -175,7 +175,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--max_padding", type=int, default=20)
     parser.add_argument("--dataset_name", type=str, choices=["wmt14", "m30k"])
-    parser.add_argument("--cache", type=bool, default=True)
+    parser.add_argument("--cache", action="store_true")
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

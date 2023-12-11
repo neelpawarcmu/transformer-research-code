@@ -7,6 +7,7 @@ from data.processors import SentenceProcessor
 from model.full_model import TransformerModel
 from training.logging import DirectoryCreator, TranslationLogger
 from inference.utils import greedy_decode, BleuUtils
+from data.download import DataDownloader
 
 class Translator:
     def __init__(self, args, config_path):
@@ -38,7 +39,7 @@ class Translator:
         Load tokenizers and vocabularies
         '''
         tokenizer_src, tokenizer_tgt = build_tokenizers(self.config['language_pair'])
-        vocab_src, vocab_tgt = load_vocabularies()
+        vocab_src, vocab_tgt = load_vocabularies(cache=True)
         self.tokenizer_src = tokenizer_src
         self.tokenizer_tgt = tokenizer_tgt
         self.vocab_src = vocab_src
