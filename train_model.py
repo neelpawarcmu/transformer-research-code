@@ -4,6 +4,7 @@ import json
 import torch
 from torch.optim.lr_scheduler import LambdaLR
 from model.full_model import TransformerModel
+from model.utils import count_params
 from vocab.vocab_utils import build_tokenizers, load_vocabularies
 from data.download import DataDownloader
 from data.processors import DataProcessor
@@ -43,6 +44,7 @@ def create_config(args, src_vocab_size, tgt_vocab_size):
         "max_padding": args.max_padding,
         "warmup": 3000,
         "model_dir": f"artifacts/saved_models",
+        "fraction": args.fraction,
     }
     # save config as a json file
     with open('artifacts/training_config.json', 'w') as fp:
@@ -176,6 +178,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_padding", type=int, default=20)
     parser.add_argument("--dataset_name", type=str, choices=["wmt14", "m30k"])
     parser.add_argument("--cache", action="store_true")
+    parser.add_argument("--fraction", type=float, default=1.0)
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -203,6 +206,9 @@ if __name__ == "__main__":
                          config["N"], config["d_model"], config["d_ff"],
                          config["h"], config["dropout_prob"])
     model = model.to(device)
+    
+    # print number of model params
+    count_params(model)
     
     # load data
     train_dataset, val_dataset, test_dataset = load_datasets(config["dataset_name"],

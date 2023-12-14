@@ -1,7 +1,7 @@
 import torch
 import os.path as op
-import torchtext.datasets as datasets
-from datasets import load_dataset # TODO: move to download.py
+import torchtext.datasets # torchtext.datasets
+from datasets import load_dataset # huggingface datasets
 
 class DataDownloader:
     @staticmethod
@@ -19,7 +19,7 @@ class DataDownloader:
         name: Name of dataset, options: ['wmt14', 'm30k']
         '''
         # conditionally return saved data directly
-        cache_path = "artifacts/saved_data/preprocd_data.pt"
+        cache_path = f"artifacts/saved_data/preprocd_data_{name}.pt"
         if (preprocess and cache and op.exists(cache_path)):
             preprocessed_data = torch.load(cache_path)
             print(f"Loaded data from {cache_path}")
@@ -31,9 +31,9 @@ class DataDownloader:
             train, val, test = (dataset_dict['train']['translation'], 
                                 dataset_dict['validation']['translation'], 
                                 dataset_dict['test']['translation'])
-            raw_data = [tuple(sentence_pair.values()) for sentence_pair in train + val + test]
+            raw_data = [tuple(sentence_pair.values()) for sentence_pair in train + val + test][:500000]
         elif name == 'm30k':
-            train_iter, valid_iter, test_iter = datasets.Multi30k(language_pair=language_pair) 
+            train_iter, valid_iter, test_iter = torchtext.datasets.Multi30k(language_pair=language_pair) 
             raw_data = train_iter + valid_iter + test_iter
         else: 
             raise ValueError(f"Received {name}, available datasets 'wmt14' and 'm30k'")
