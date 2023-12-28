@@ -37,7 +37,16 @@ class TransformerModel(nn.Module):
         for p in self.parameters():
             if p.dim() > 1: # presumably biases skipped TODO: verify this
                 nn.init.xavier_uniform_(p)
-
+        from model.utils import count_params
+        for layer in [self, 
+                      self.input_embedding_layer, 
+                      self.output_embedding_layer, 
+                      self.input_positional_enc_layer, 
+                      self.output_positional_enc_layer,
+                      self.encoder_stack, self.decoder_stack, 
+                      self.linear_and_softmax_layers]:
+            count_params(layer)
+        
     def encode(self, src):
         # embed and add positional encoding
         src_embeddings = self.input_embedding_layer(src)

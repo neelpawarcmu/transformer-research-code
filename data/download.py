@@ -5,7 +5,7 @@ from datasets import load_dataset # huggingface datasets
 
 class DataDownloader:
     @staticmethod
-    def get_data(name, language_pair, cache, preprocess, preprocessor=None):
+    def get_data(name, language_pair, cache, preprocess, preprocessor=None, dataset_size=5000000):
         '''
         Gets data from the Pytorch Multi30k dataset. Returns data in one of two
         formats, 'raw' or 'preprocessed':
@@ -31,10 +31,12 @@ class DataDownloader:
             train, val, test = (dataset_dict['train']['translation'], 
                                 dataset_dict['validation']['translation'], 
                                 dataset_dict['test']['translation'])
-            raw_data = [tuple(sentence_pair.values()) for sentence_pair in train + val + test][:500000]
+            raw_data = [tuple(sentence_pair.values()) for sentence_pair 
+                        in (train + val + test)[:dataset_size]]
         elif name == 'm30k':
             train_iter, valid_iter, test_iter = torchtext.datasets.Multi30k(language_pair=language_pair) 
-            raw_data = train_iter + valid_iter + test_iter
+            raw_data = [sentence_pair for sentence_pair 
+                        in (train_iter + valid_iter + test_iter)[:dataset_size]]
         else: 
             raise ValueError(f"Received {name}, available datasets 'wmt14' and 'm30k'")
         

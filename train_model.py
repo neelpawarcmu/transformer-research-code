@@ -44,7 +44,7 @@ def create_config(args, src_vocab_size, tgt_vocab_size):
         "max_padding": args.max_padding,
         "warmup": 3000,
         "model_dir": f"artifacts/saved_models",
-        "fraction": args.fraction,
+        "dataset_size": args.dataset_size,
     }
     # save config as a json file
     with open('artifacts/training_config.json', 'w') as fp:
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_padding", type=int, default=20)
     parser.add_argument("--dataset_name", type=str, choices=["wmt14", "m30k"])
     parser.add_argument("--cache", action="store_true")
-    parser.add_argument("--fraction", type=float, default=1.0)
+    parser.add_argument("--dataset_size", type=int, default=5000000)
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -195,9 +195,9 @@ if __name__ == "__main__":
                                                  args.dataset_name,
                                                  args.language_pair,
                                                  cache=args.cache,
-                                                 preprocess=False),
+                                                 preprocess=False,
+                                                 dataset_size=args.dataset_size),
                                              cache=args.cache)
-
     # create configuration for training
     config = create_config(args, vocab_src.length, vocab_tgt.length)
 
@@ -220,7 +220,8 @@ if __name__ == "__main__":
                                                              config["max_padding"],
                                                              device=device,
                                                              cache=args.cache,
-                                                             random_seed=4)
+                                                             random_seed=40,
+                                                             dataset_size=args.dataset_size)
 
     train_dataloader, val_dataloader, test_dataloader = load_dataloaders(train_dataset, 
                                                                          val_dataset, 

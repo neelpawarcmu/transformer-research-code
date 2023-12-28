@@ -73,7 +73,8 @@ class RuntimeDataset(torch.utils.data.Dataset):
     
         
 def load_datasets(name, language_pair, tokenizer_src, tokenizer_tgt, vocab_src, 
-                  vocab_tgt, max_padding, device, cache, random_seed=None):
+                  vocab_tgt, max_padding, device, cache, random_seed=None, 
+                  dataset_size=5000000):
     '''
     A utility function that sources the preprocessed data, calls a split on 
     it, generates runtime dataset splits for training, validation and testing.
@@ -89,7 +90,8 @@ def load_datasets(name, language_pair, tokenizer_src, tokenizer_tgt, vocab_src,
                                             language_pair=language_pair, 
                                             cache=cache, 
                                             preprocess=True, 
-                                            preprocessor=data_processor)
+                                            preprocessor=data_processor,
+                                            dataset_size=dataset_size)
     
     (preprocd_train_data, 
      preprocd_val_data, 
