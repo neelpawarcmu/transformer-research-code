@@ -12,3 +12,4 @@ flake8
 black
 GPUtil
 wandb
+numerize
