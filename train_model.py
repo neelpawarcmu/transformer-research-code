@@ -13,7 +13,6 @@ from training.logging import DirectoryCreator
 from training.loss import SimpleLossCompute, LabelSmoothing
 from training.logging import TrainingLogger
 from inference.utils import BleuUtils
-from types import SimpleNamespace
 
 def create_model(src_vocab_size: int,
                  tgt_vocab_size: int,
@@ -96,19 +95,19 @@ def train(train_dataloader, val_dataloader, model, criterion,
         torch.save(model.state_dict(),
                    f'{config["model_dir"]}/N{config["N"]}/epoch_{epoch:02d}.pt')
 
-    # plot and save loss curves
-    logger.saveplot(
-        metric_names=['train_loss', 'val_loss'], 
-        title='Losses',
-        title_dict={k:config[k] for k in ['batch_size', 'N']}, 
-        plot_type='loss',
-    )
-    logger.saveplot(
-        metric_names=['train_bleu', 'val_bleu'], 
-        title='BLEU scores',
-        title_dict={k:config[k] for k in ['batch_size', 'N']}, 
-        plot_type='bleu',
-    )
+        # plot and save loss curves
+        logger.saveplot(
+            metric_names=['train_loss', 'val_loss'], 
+            title='Losses',
+            title_dict={k:config[k] for k in ['batch_size', 'N', 'dataset_size']}, 
+            plot_type='loss',
+        )
+        logger.saveplot(
+            metric_names=['train_bleu', 'val_bleu'], 
+            title='BLEU scores',
+            title_dict={k:config[k] for k in ['batch_size', 'N', 'dataset_size']}, 
+            plot_type='bleu',
+        )
 
 def run_train_epoch(train_dataloader, model, criterion, optimizer, 
                     scheduler, accum_iter):
@@ -122,9 +121,9 @@ def run_train_epoch(train_dataloader, model, criterion, optimizer,
                                              batch.decoder_attn_mask)
         # compute loss and BLEU score
         loss = criterion(output_logprobabilities, batch.tgt_label, batch.ntokens)
-        batch.predictions = torch.argmax(output_logprobabilities, dim=2)   
+        predictions = torch.argmax(output_logprobabilities, dim=2)   
         # TODO: passing global variable for 'bleu_utils' below should be resolved
-        bleu = bleu_utils.compute_batch_bleu(batch)
+        bleu = bleu_utils.compute_batch_bleu(predictions, batch.tgt_label)
         # backpropagate and apply optimizer-based gradient descent 
         loss.backward()
         if i % accum_iter == 0:
@@ -158,8 +157,8 @@ def run_val_epoch(val_dataloader, model, criterion):
         # compute loss and BLEU score
         loss = criterion(output_logprobabilities, batch.tgt_label, batch.ntokens)
         # TODO: passing global variable for 'bleu_utils' here should be resolved
-        batch.predictions = torch.argmax(output_logprobabilities, dim=2)   
-        bleu = bleu_utils.compute_batch_bleu(batch)
+        predictions = torch.argmax(output_logprobabilities, dim=2)   
+        bleu = bleu_utils.compute_batch_bleu(predictions, batch.tgt_label)
         # accumulate loss and BLEU score
         total_loss += loss.detach().cpu().numpy()
         total_bleu += bleu

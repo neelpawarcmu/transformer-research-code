@@ -79,7 +79,7 @@ class TranslationLogger:
         self.sentences = defaultdict(list)
         self.metrics = defaultdict(float)
 
-    def log(self, name, value):
+    def log_sentence(self, name, value):
         '''
         Logs sentences like target sentence, predicted sentence and so on.
         '''

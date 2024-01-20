@@ -90,9 +90,9 @@ class Translator:
             src_sentence = SentenceProcessor.tokens_to_sentence(batch.src[0], self.vocab_src)
             tgt_sentence = SentenceProcessor.tokens_to_sentence(batch.tgt_shifted_right[0], self.vocab_tgt)
             pred_sentence = SentenceProcessor.tokens_to_sentence(batch.predictions[0], self.vocab_tgt)
-            logger.log('Source sentence', src_sentence)
-            logger.log('Target sentence (Ground truth)', tgt_sentence)
-            logger.log('Predicted sentence (Model output)', pred_sentence)
+            logger.log_sentence('Source sentence', src_sentence)
+            logger.log_sentence('Target sentence (Ground truth)', tgt_sentence)
+            logger.log_sentence('Predicted sentence (Model output)', pred_sentence)
 
 
 if __name__ == "__main__":

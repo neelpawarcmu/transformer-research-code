@@ -55,7 +55,7 @@ def build_tokenizers(language_pair):
     tokenizer_tgt = SpacyTokenizer(language_pair[1])
     return tokenizer_src, tokenizer_tgt
 
-def load_vocabularies(tokenizer_src=None, tokenizer_tgt=None, data=None, cache=True):
+def load_vocabularies(tokenizer_src=None, tokenizer_tgt=None, data=None, cache=False):
     """
     Loads vocabs if saved, else creates and saves them locally.
     """

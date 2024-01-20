@@ -69,17 +69,17 @@ class BleuUtils:
         ground_truths = [[res[1].split()] for res in results] # ground truth
         predictions = [res[2].split() for res in results] # list of list of label tokens
         return bleu_score(predictions, ground_truths)
-    
-    def compute_batch_bleu(self, batch):
+     
+    def compute_batch_bleu(self, predictions, tgt_label):
         # convert token tensor to list of sentences
         predicted_sentences = [SentenceProcessor.tokens_to_sentence(
-            batch.predictions[i], self.vocab_tgt) 
-            for i in range(len(batch.predictions))]
+            predictions[i], self.vocab_tgt) 
+            for i in range(len(predictions))]
         
         # convert token tensor to list of sentences
         actual_sentences = [SentenceProcessor.tokens_to_sentence(
-            batch.tgt_label[i], self.vocab_tgt) 
-            for i in range(len(batch.tgt_label))]
+            tgt_label[i], self.vocab_tgt) 
+            for i in range(len(tgt_label))]
         
         # convert to format required by bleu function
         predicted_sentences_list = [sentence.split() for sentence in predicted_sentences]

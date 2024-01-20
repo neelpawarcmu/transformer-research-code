@@ -16,7 +16,7 @@ class LabelSmoothing(nn.Module):
 
     def forward(self, x, target):
         assert x.size(1) == self.vocab_size
-        true_dist = x.data.clone() # TODO: init with zeros
+        true_dist = torch.zeros_like(x)
         true_dist.fill_(self.smoothing / (self.vocab_size - 2))
         true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
         true_dist[:, self.pad_idx] = 0
