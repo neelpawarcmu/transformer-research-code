@@ -69,7 +69,7 @@ class TrainingLogger:
         # save plot
         save_path = (f"artifacts/loss_curves/"
                      f"N{title_dict['N']}/{title.lower().replace(' ', '_')}"
-                     f"_bs_{title_dict['batch_size']}.png")
+                     f"_dataset_size_{title_dict['dataset_size']}.png")
         plt.show()
         plt.pause(0.01)
         plt.savefig(save_path)

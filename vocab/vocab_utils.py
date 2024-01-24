@@ -67,7 +67,7 @@ def load_vocabularies(tokenizer_src=None, tokenizer_tgt=None, data=None, cache=F
     else:
         vocab_src = VocabularyBuilder(tokenizer_src, data, "src").vocab
         vocab_tgt = VocabularyBuilder(tokenizer_tgt, data, "tgt").vocab
-        torch.save((vocab_src, vocab_tgt), cache_path)
+        # torch.save((vocab_src, vocab_tgt), cache_path)
     
     print("-"*80)
     print(f"{vocab_src.language.upper()} vocabulary size: {vocab_src.length}")

@@ -43,7 +43,7 @@ class DataDownloader:
         # preprocess and save if needed
         if preprocess:
             preprocessed_data = preprocessor.preprocess_data(raw_data)
-            torch.save(preprocessed_data, cache_path) 
+            # torch.save(preprocessed_data, cache_path) 
             return preprocessed_data
         else:
             return raw_data
