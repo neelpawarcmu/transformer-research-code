@@ -5,7 +5,8 @@ import torch
 from torch.optim.lr_scheduler import LambdaLR
 from model.full_model import TransformerModel
 from model.utils import count_params
-from vocab.vocab_utils import build_tokenizers, load_vocabularies
+# from vocab.vocab_utils import build_tokenizers, load_vocabularies
+from vocab.new_tokenizer import build_tokenizers
 from data.download import DataDownloader
 from data.processors import DataProcessor
 from data.runtime_loaders import load_datasets, load_dataloaders
@@ -44,6 +45,8 @@ def create_config(args, src_vocab_size, tgt_vocab_size):
         "warmup": 3000,
         "model_dir": f"artifacts/saved_models",
         "dataset_size": args.dataset_size,
+        "experiment_name": args.experiment_name,
+        "random_seed": args.random_seed,
     }
     # save config as a json file
     with open('artifacts/training_config.json', 'w') as fp:
@@ -62,7 +65,8 @@ def train(train_dataloader, val_dataloader, model, criterion,
           optimizer, scheduler, config):
     
     # initiate logger for saving metrics
-    logger = TrainingLogger()
+    logger = TrainingLogger(config)
+    logger.autolog()
     # start training
     for epoch in range(1, config["num_epochs"]+1): # epochs are 1-indexed
         # initialize timer
@@ -117,8 +121,8 @@ def run_train_epoch(train_dataloader, model, criterion, optimizer,
     total_loss, total_bleu = 0, 0
     for i, batch in enumerate(train_dataloader):
         output_logprobabilities = model.forward(batch.src, 
-                                             batch.tgt_shifted_right,
-                                             batch.decoder_attn_mask)
+                                                batch.tgt_shifted_right,
+                                                batch.decoder_attn_mask)
         # compute loss and BLEU score
         loss = criterion(output_logprobabilities, batch.tgt_label, batch.ntokens)
         predictions = torch.argmax(output_logprobabilities, dim=2)   
@@ -178,9 +182,10 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_name", type=str, choices=["wmt14", "m30k"])
     parser.add_argument("--cache", action="store_true")
     parser.add_argument("--dataset_size", type=int, default=5000000)
+    parser.add_argument("--experiment_name")
     parser.add_argument("--random_seed", type=int, default=40)
     args = parser.parse_args()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 
     # if missing, create directories required for saving artifacts
     DirectoryCreator.create_dirs(['saved_vocab', 
@@ -190,16 +195,7 @@ if __name__ == "__main__":
 
     # load tokenizers and vocabulary
     tokenizer_src, tokenizer_tgt = build_tokenizers(args.language_pair)
-    vocab_src, vocab_tgt = load_vocabularies(tokenizer_src, tokenizer_tgt,
-                                             data=DataDownloader.get_data(
-                                                 args.dataset_name,
-                                                 args.language_pair,
-                                                 cache=args.cache,
-                                                 preprocess=False,
-                                                 dataset_size=args.dataset_size),
-                                             cache=args.cache)
-    # create configuration for training
-    config = create_config(args, vocab_src.length, vocab_tgt.length)
+    config = create_config(args, len(tokenizer_src.vocab), len(tokenizer_tgt.vocab))
 
     # initialize model
     model = create_model(config["src_vocab_size"], config["tgt_vocab_size"],
@@ -207,16 +203,11 @@ if __name__ == "__main__":
                          config["h"], config["dropout_prob"])
     model = model.to(device)
     
-    # print number of model params
-    count_params(model)
-    
     # load data
     train_dataset, val_dataset, test_dataset = load_datasets(config["dataset_name"],
                                                              config["language_pair"],
                                                              tokenizer_src, 
-                                                             tokenizer_tgt, 
-                                                             vocab_src,
-                                                             vocab_tgt,
+                                                             tokenizer_tgt,
                                                              config["max_padding"],
                                                              device=device,
                                                              cache=args.cache,
@@ -230,7 +221,8 @@ if __name__ == "__main__":
                                                                          shuffle=True)
     
     # create loss criterion, learning rate optimizer and scheduler
-    label_smoothing = LabelSmoothing(vocab_tgt.length, vocab_tgt["<blank>"], 0.1)
+    label_smoothing = LabelSmoothing(len(tokenizer_tgt.vocab), 
+                                     tokenizer_tgt.pad_token_id, 0.1)
     label_smoothing = label_smoothing.to(device)
     criterion = SimpleLossCompute(label_smoothing)
     optimizer = torch.optim.Adam(model.parameters(), lr=config["base_lr"], 
@@ -241,7 +233,7 @@ if __name__ == "__main__":
                          warmup=config["warmup"]))
     
     # initialize translation utils TODO: check if this needs to go somewhere else / needs refactoring
-    bleu_utils = BleuUtils(vocab_src, vocab_tgt)
+    bleu_utils = BleuUtils(tokenizer_src, tokenizer_tgt)
 
     # train
     train(train_dataloader, val_dataloader, model, criterion, optimizer, scheduler, config)

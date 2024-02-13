@@ -1,7 +1,8 @@
 import json
 import argparse
 import torch
-from vocab.vocab_utils import build_tokenizers, load_vocabularies
+# from vocab.vocab_utils import build_tokenizers, load_vocabularies
+from vocab.new_tokenizer import build_tokenizers, load_vocabularies
 from data.runtime_loaders import load_datasets, load_dataloaders
 from data.processors import SentenceProcessor
 from model.full_model import TransformerModel
@@ -72,7 +73,7 @@ class Translator:
             self.config["max_padding"],
             device=torch.device("cpu"),
             cache=True,
-            random_seed=4)
+            random_seed=40)
 
         train_dataloader, val_dataloader, test_dataloader = load_dataloaders(
             train_dataset, 

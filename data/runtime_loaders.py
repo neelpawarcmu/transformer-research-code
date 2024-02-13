@@ -8,23 +8,23 @@ class Batch:
     """
     Object for holding a batch of data with mask during training.
     """
-    def __init__(self, src, tgt=None, pad_idx=2):  # 2 = <blank>
+    def __init__(self, pad_idx_tgt, src, tgt=None):
         self.src = src
         if tgt is not None:
             self.tgt_shifted_right = tgt[:, :-1] # everything except last pad token
             self.tgt_label = tgt[:, 1:] # everything except beginning of sentence token
             self.decoder_attn_mask = self.make_decoder_attn_mask(
-                self.tgt_shifted_right, pad_idx
+                self.tgt_shifted_right, pad_idx_tgt
             )
-            self.ntokens = (self.tgt_label != pad_idx).sum()
+            self.ntokens = (self.tgt_label != pad_idx_tgt).sum()
 
     @staticmethod
-    def make_decoder_attn_mask(tgt, pad_idx):
+    def make_decoder_attn_mask(tgt, pad_idx_tgt):
         """
         Create a mask to hide padding and future words.
         TODO: explain multi mask creation for entire batch
         """
-        pad_mask = (tgt != pad_idx).unsqueeze(-2)
+        pad_mask = (tgt != pad_idx_tgt).unsqueeze(-2)
         pad_mask_T = pad_mask.transpose(1,2)
         subseq_tokens_mask = Batch.get_subseq_tokens_mask(tgt)
         decoder_attn_mask = pad_mask & subseq_tokens_mask & pad_mask_T
@@ -43,10 +43,11 @@ class Batch:
         return subseq_tokens_mask
     
 class RuntimeDataset(torch.utils.data.Dataset):
-    def __init__(self, dataset, device):
+    def __init__(self, dataset, device, pad_idx_tgt):
         self.dataset = dataset
         self.length = dataset.shape[0]
         self.device = device
+        self.pad_idx_tgt = pad_idx_tgt
     
     def __getitem__(self, i):
         '''
@@ -69,11 +70,11 @@ class RuntimeDataset(torch.utils.data.Dataset):
         batch_tensor = torch.stack(raw_batch)
         batch_src = batch_tensor[:,0,:].to(self.device)
         batch_tgt = batch_tensor[:,1,:].to(self.device)
-        return Batch(batch_src, batch_tgt)
+        return Batch(self.pad_idx_tgt, batch_src, batch_tgt)
     
         
-def load_datasets(name, language_pair, tokenizer_src, tokenizer_tgt, vocab_src, 
-                  vocab_tgt, max_padding, device, cache, random_seed=None, 
+def load_datasets(name, language_pair, tokenizer_src, tokenizer_tgt,
+                  max_padding, device, cache, random_seed=None, 
                   dataset_size=5000000):
     '''
     A utility function that sources the preprocessed data, calls a split on 
@@ -82,8 +83,6 @@ def load_datasets(name, language_pair, tokenizer_src, tokenizer_tgt, vocab_src,
     print(f'loading dataset {name}')
     data_processor = DataProcessor(tokenizer_src,
                                    tokenizer_tgt,
-                                   vocab_src,
-                                   vocab_tgt,
                                    max_padding,
                                    language_pair)
     preprocd_data = DataDownloader.get_data(name=name, 
@@ -99,9 +98,9 @@ def load_datasets(name, language_pair, tokenizer_src, tokenizer_tgt, vocab_src,
         preprocd_data, random_seed=random_seed
     )
     
-    train_dataset = RuntimeDataset(preprocd_train_data, device)
-    val_dataset = RuntimeDataset(preprocd_val_data, device)
-    test_dataset = RuntimeDataset(preprocd_test_data, device)
+    train_dataset = RuntimeDataset(preprocd_train_data, device, tokenizer_tgt.pad_token_id)
+    val_dataset = RuntimeDataset(preprocd_val_data, device, tokenizer_tgt.pad_token_id)
+    test_dataset = RuntimeDataset(preprocd_test_data, device, tokenizer_tgt.pad_token_id)
 
     print(f"Number of sentence pairs: \n"
           f"Training: {train_dataset.length}\t"

@@ -9,7 +9,7 @@ def greedy_decode(model, batch, vocab_tgt):
     argmax function across the output.
     """
     batch_size, max_padding = batch.src.shape
-    bos_id, eos_id, pad_id = vocab_tgt(["<s>", "</s>", "<blank>"])
+    bos_id, eos_id, pad_id = vocab_tgt(["<s>", "</s>", "[PAD]"])
     bos_tensor = torch.full((batch_size, 1), bos_id)
     predictions_with_bos = bos_tensor
     for i in range(max_padding - 1):
@@ -43,7 +43,7 @@ def probabilistic_decode(model, batch, vocab_tgt):
     # TODO: remove extra code from decode functions and consolidate into one predict function. 
     #       code in decode should only be argmax, or probmax
     batch_size, max_padding = batch.src.shape
-    bos_id, eos_id, pad_id = vocab_tgt(["<s>", "</s>", "<blank>"])
+    bos_id, eos_id, pad_id = vocab_tgt(["<s>", "</s>", "[PAD]"])
     bos_tensor = torch.full((batch_size, 1), bos_id)
     predictions_with_bos = bos_tensor
     for i in range(max_padding - 1):
@@ -56,9 +56,9 @@ def probabilistic_decode(model, batch, vocab_tgt):
 
 
 class BleuUtils:
-    def __init__(self, vocab_src, vocab_tgt):
-        self.vocab_src = vocab_src
-        self.vocab_tgt = vocab_tgt
+    def __init__(self, tokenizer_src, tokenizer_tgt):
+        self.tokenizer_src = tokenizer_src
+        self.tokenizer_tgt = tokenizer_tgt
     
     @classmethod
     def compute_bleu(cls, results):
@@ -73,12 +73,12 @@ class BleuUtils:
     def compute_batch_bleu(self, predictions, tgt_label):
         # convert token tensor to list of sentences
         predicted_sentences = [SentenceProcessor.tokens_to_sentence(
-            predictions[i], self.vocab_tgt) 
+            predictions[i], self.tokenizer_tgt) 
             for i in range(len(predictions))]
         
         # convert token tensor to list of sentences
         actual_sentences = [SentenceProcessor.tokens_to_sentence(
-            tgt_label[i], self.vocab_tgt) 
+            tgt_label[i], self.tokenizer_tgt) 
             for i in range(len(tgt_label))]
         
         # convert to format required by bleu function

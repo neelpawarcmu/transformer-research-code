@@ -6,7 +6,7 @@ from torchtext.data.functional import to_map_style_dataset
 
 class SentenceProcessor:
     @classmethod
-    def sentence_to_tokens(cls, sentence, tokenizer, vocab, max_padding):
+    def sentence_to_tokens(cls, sentence, tokenizer, max_padding):
         '''
         Performs the following operations:
         - tokenize sentence
@@ -15,11 +15,11 @@ class SentenceProcessor:
         - pad end of sentence up to the max_padding argument
         '''
         # get ids for beginning and end of sentence, and padding markers
-        bos_id, eos_id, pad_id = vocab(["<s>", "</s>", "<blank>"])
+        bos_id, eos_id, pad_id = tokenizer.bos_token_id, tokenizer.eos_token_id, tokenizer.pad_token_id
         # tokenize sentence into individual tokens
         tokens = tokenizer.tokenize(sentence)
         # map tokens to ids and add beginning, end of sentence markers
-        token_ids = [bos_id] + vocab(tokens) + [eos_id]
+        token_ids = [bos_id] + tokenizer.convert_tokens_to_ids(tokens) + [eos_id]
         # convert to tensor for compatibility with padding function
         token_ids_tensor = torch.tensor(token_ids, dtype=torch.int64)
         # pad token ids
@@ -28,14 +28,14 @@ class SentenceProcessor:
         return padded_token_ids_tensor
     
     @classmethod
-    def tokens_to_sentence(cls, padded_token_ids_tensor, vocab):
+    def tokens_to_sentence(cls, padded_token_ids_tensor, tokenizer):
         '''
         Reverse operations to those described under 
         :meth:`<processors.SentenceProcessor.sentence_to_tokens>`
         Note that we choose to remove bos and eos tokens
         '''
         # get ids for beginning and end of sentence, and padding markers
-        bos_id, eos_id, pad_id = vocab(["<s>", "</s>", "<blank>"])
+        bos_id, eos_id, pad_id = tokenizer.bos_token_id, tokenizer.eos_token_id, tokenizer.pad_token_id
         # convert to list
         padded_token_ids = padded_token_ids_tensor.tolist()
         # remove padding
@@ -44,20 +44,18 @@ class SentenceProcessor:
         eos_position = unpadded_token_ids.index(eos_id) if eos_id in unpadded_token_ids else len(unpadded_token_ids)
         token_ids = unpadded_token_ids[1 : eos_position]
         # get tokens from token ids
-        tokens = vocab.lookup_tokens(token_ids)
+        tokens = tokenizer.convert_ids_to_tokens(token_ids)
         sentence = " ".join(tokens)
         return sentence
     
 
 class DataProcessor(SentenceProcessor):
-    def __init__(self, tokenizer_src, tokenizer_tgt, vocab_src, vocab_tgt,
+    def __init__(self, tokenizer_src, tokenizer_tgt,
                  max_padding, language_pair):
         super().__init__()
         # TODO: language_pair arg comes first for consistency
         self.tokenizer_src = tokenizer_src
         self.tokenizer_tgt = tokenizer_tgt
-        self.vocab_src = vocab_src
-        self.vocab_tgt = vocab_tgt
         self.max_padding = max_padding
         self.language_pair = language_pair
 
@@ -76,11 +74,9 @@ class DataProcessor(SentenceProcessor):
         for i, (src, tgt) in enumerate(tqdm(data_map, desc="Preprocessing dataset")):
             preprocessed_src = self.sentence_to_tokens(src, 
                                                        self.tokenizer_src,
-                                                       self.vocab_src,
                                                        self.max_padding)
             preprocessed_tgt = self.sentence_to_tokens(tgt, 
                                                        self.tokenizer_tgt,
-                                                       self.vocab_tgt,
                                                        self.max_padding)
             preprocessed_dataset[i][0] = preprocessed_src
             preprocessed_dataset[i][1] = preprocessed_tgt

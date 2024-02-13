@@ -2,6 +2,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import os
+import mlflow
 
 class DirectoryCreator:
     base_path = 'artifacts'
@@ -21,9 +22,29 @@ class DirectoryCreator:
         '''
         for dir in dirs:
             cls.add_dir(dir, include_base_path=True)
-            
-class TrainingLogger:
-    def __init__(self):
+
+class BaseLogger:
+    def __init__(self, config):
+        self.tracking_uri = "http://127.0.0.1:8080"
+        self.experiment_name = config["experiment_name"]
+        run_name = "_".join([f'{k}_{config[k]}' for k in ["N", 
+                                                         "dataset_size",
+                                                         "random_seed",
+                                                         ]])
+        self.run_name = run_name
+        self.client = mlflow.tracking.MlflowClient()
+        mlflow.start_run()
+
+    def autolog(self):
+        mlflow.autolog()
+    
+    def upload_artifacts(self):
+        raise NotImplementedError
+
+
+class TrainingLogger(BaseLogger):
+    def __init__(self, config):
+        super().__init__(config)
         self.metrics = defaultdict(list)
 
     def log(self, name, value):
@@ -73,9 +94,13 @@ class TrainingLogger:
         plt.show()
         plt.pause(0.01)
         plt.savefig(save_path)
+        plt.close()
+    mlflow.log_artifacts("artifacts")
+    mlflow.end_run()
 
-class TranslationLogger:
-    def __init__(self):
+class TranslationLogger(BaseLogger):
+    def __init__(self, config):
+        super().__init__(config)
         self.sentences = defaultdict(list)
         self.metrics = defaultdict(float)
 

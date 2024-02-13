@@ -18,9 +18,9 @@ class VocabularyBuilder:
         vocab = build_vocab_from_iterator(
             iterator = self._yield_tokens(data_iterator = data),
             min_freq = 2,
-            specials = ["<s>", "</s>", "<blank>", "<unk>"],
+            specials = ["<s>", "</s>", "[PAD]", "[UNK]"],
         )
-        vocab.set_default_index(vocab["<unk>"])
+        vocab.set_default_index(vocab["[UNK]"])
         return vocab
     
     def _yield_tokens(self, data_iterator):
@@ -70,7 +70,7 @@ def load_vocabularies(tokenizer_src=None, tokenizer_tgt=None, data=None, cache=F
         # torch.save((vocab_src, vocab_tgt), cache_path)
     
     print("-"*80)
-    print(f"{vocab_src.language.upper()} vocabulary size: {vocab_src.length}")
-    print(f"{vocab_tgt.language.upper()} vocabulary size: {vocab_tgt.length}")
+    print(f"{vocab_src.language.upper()} vocabulary size: {len(tokenizer_src.vocab)}")
+    print(f"{vocab_tgt.language.upper()} vocabulary size: {len(tokenizer_tgt.vocab)}")
     print("-"*80)
     return vocab_src, vocab_tgt
