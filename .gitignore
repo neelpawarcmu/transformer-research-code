@@ -6,3 +6,6 @@ __pycache__
 */*.pyc
 temp
 mlruns
+*.job
+*.out
+slurm*

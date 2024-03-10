@@ -19,7 +19,7 @@ class DataDownloader:
         name: Name of dataset, options: ['wmt14', 'm30k']
         '''
         # conditionally return saved data directly
-        cache_path = f"artifacts/saved_data/preprocd_data_{name}.pt"
+        cache_path = f"artifacts/saved_data/preprocd_{name}_{dataset_size}.pt"
         if (preprocess and cache and op.exists(cache_path)):
             preprocessed_data = torch.load(cache_path)
             print(f"Loaded data from {cache_path}")
@@ -43,7 +43,7 @@ class DataDownloader:
         # preprocess and save if needed
         if preprocess:
             preprocessed_data = preprocessor.preprocess_data(raw_data)
-            # torch.save(preprocessed_data, cache_path) 
+            torch.save(preprocessed_data, cache_path) 
             return preprocessed_data
         else:
             return raw_data

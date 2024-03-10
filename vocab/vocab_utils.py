@@ -55,19 +55,12 @@ def build_tokenizers(language_pair):
     tokenizer_tgt = SpacyTokenizer(language_pair[1])
     return tokenizer_src, tokenizer_tgt
 
-def load_vocabularies(tokenizer_src=None, tokenizer_tgt=None, data=None, cache=False):
+def load_vocabularies(tokenizer_src=None, tokenizer_tgt=None, data=None):
     """
     Loads vocabs if saved, else creates and saves them locally.
     """
-    cache_path = "artifacts/saved_vocab/vocabs.pt"
-
-    if cache and os.path.exists(cache_path):
-        print(f"Loaded vocab from {cache_path}")
-        vocab_src, vocab_tgt = torch.load(cache_path)
-    else:
-        vocab_src = VocabularyBuilder(tokenizer_src, data, "src").vocab
-        vocab_tgt = VocabularyBuilder(tokenizer_tgt, data, "tgt").vocab
-        # torch.save((vocab_src, vocab_tgt), cache_path)
+    vocab_src = VocabularyBuilder(tokenizer_src, data, "src").vocab
+    vocab_tgt = VocabularyBuilder(tokenizer_tgt, data, "tgt").vocab
     
     print("-"*80)
     print(f"{vocab_src.language.upper()} vocabulary size: {len(tokenizer_src.vocab)}")

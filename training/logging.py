@@ -25,6 +25,7 @@ class DirectoryCreator:
 
 class BaseLogger:
     def __init__(self, config):
+        self.config = config
         self.tracking_uri = "http://127.0.0.1:8080"
         self.experiment_name = config["experiment_name"]
         run_name = "_".join([f'{k}_{config[k]}' for k in ["N", 
@@ -95,8 +96,8 @@ class TrainingLogger(BaseLogger):
         plt.pause(0.01)
         plt.savefig(save_path)
         plt.close()
-    mlflow.log_artifacts("artifacts")
-    mlflow.end_run()
+        mlflow.log_artifacts(f"artifacts/loss_curves/N{self.config['N']}")
+        mlflow.end_run()
 
 class TranslationLogger(BaseLogger):
     def __init__(self, config):

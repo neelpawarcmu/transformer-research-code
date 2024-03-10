@@ -13,3 +13,8 @@ black
 GPUtil
 wandb
 numerize
+transformers
+datasets
+scikit-learn
+matplotlib
+mlflow

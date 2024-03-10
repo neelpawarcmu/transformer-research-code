@@ -3,28 +3,14 @@ import time
 import json
 import torch
 from torch.optim.lr_scheduler import LambdaLR
-from model.full_model import TransformerModel
-from model.utils import count_params
+from model.utils import create_model
 # from vocab.vocab_utils import build_tokenizers, load_vocabularies
-from vocab.new_tokenizer import build_tokenizers
-from data.download import DataDownloader
-from data.processors import DataProcessor
+from vocab.bert_tokenizer_utils import build_tokenizers
 from data.runtime_loaders import load_datasets, load_dataloaders
-from training.logging import DirectoryCreator
-from training.loss import SimpleLossCompute, LabelSmoothing
-from training.logging import TrainingLogger
+from training.logging import DirectoryCreator, TrainingLogger
+from training.loss import LabelSmoothing, SimpleLossCompute
+from training.utils import get_learning_rate
 from inference.utils import BleuUtils
-
-def create_model(src_vocab_size: int,
-                 tgt_vocab_size: int,
-                 N: int, 
-                 d_model: int = 512,
-                 d_ff: int = 2048,
-                 h: int = 8, 
-                 dropout_prob: float = 0.1):
-    model = TransformerModel(src_vocab_size, tgt_vocab_size, N, d_model, 
-                             d_ff, h, dropout_prob)
-    return model
 
 def create_config(args, src_vocab_size, tgt_vocab_size):
     config = {
@@ -52,14 +38,6 @@ def create_config(args, src_vocab_size, tgt_vocab_size):
     with open('artifacts/training_config.json', 'w') as fp:
         json.dump(config, fp)
     return config
-
-def get_learning_rate(step_num, d_model, warmup):
-    """
-    Compute the learning rate from the equation (3) in section 5.3
-    of the paper.
-    """
-    learning_rate = d_model**-0.5 * min(step_num**-0.5, step_num*warmup**-1.5)
-    return learning_rate
 
 def train(train_dataloader, val_dataloader, model, criterion, 
           optimizer, scheduler, config):
@@ -97,7 +75,7 @@ def train(train_dataloader, val_dataloader, model, criterion,
 
         # save model
         # torch.save(model.state_dict(),
-                #    f'{config["model_dir"]}/N{config["N"]}/epoch_{epoch:02d}.pt')
+        #    f'{config["model_dir"]}/N{config["N"]}/epoch_{epoch:02d}.pt')
 
         # plot and save loss curves
         logger.saveplot(
@@ -188,7 +166,7 @@ if __name__ == "__main__":
     device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 
     # if missing, create directories required for saving artifacts
-    DirectoryCreator.create_dirs(['saved_vocab', 
+    DirectoryCreator.create_dirs(['saved_tokenizers', 
                                   'saved_data',
                                   f'saved_models/N{args.N}', 
                                   f'loss_curves/N{args.N}'])
@@ -198,9 +176,7 @@ if __name__ == "__main__":
     config = create_config(args, len(tokenizer_src.vocab), len(tokenizer_tgt.vocab))
 
     # initialize model
-    model = create_model(config["src_vocab_size"], config["tgt_vocab_size"],
-                         config["N"], config["d_model"], config["d_ff"],
-                         config["h"], config["dropout_prob"])
+    model = create_model(config)
     model = model.to(device)
     
     # load data
