@@ -1,16 +1,37 @@
+print("start of imports")
 import argparse
 import time
 import json
 import torch
 from torch.optim.lr_scheduler import LambdaLR
-from model.utils import create_model
-# from vocab.vocab_utils import build_tokenizers, load_vocabularies
+from vocab.vocab_utils import build_tokenizers
 from vocab.bert_tokenizer_utils import build_tokenizers
 from data.runtime_loaders import load_datasets, load_dataloaders
 from training.logging import DirectoryCreator, TrainingLogger
 from training.loss import LabelSmoothing, SimpleLossCompute
 from training.utils import get_learning_rate
 from inference.utils import BleuUtils
+from model.full_model import TransformerModel
+from model.utils import count_params
+
+def create_model(config):
+    model =  TransformerModel(config["src_vocab_size"], 
+                              config["tgt_vocab_size"], 
+                              config["N"], 
+                              config["d_model"], 
+                              config["d_ff"], 
+                              config["h"], 
+                              config["dropout_prob"])
+    for layer in [model, 
+                  model.input_embedding_layer, 
+                  model.output_embedding_layer, 
+                  model.input_positional_enc_layer, 
+                  model.output_positional_enc_layer,
+                  model.encoder_stack, 
+                  model.decoder_stack, 
+                  model.linear_and_softmax_layers]:
+        count_params(layer)
+    return model
 
 def create_config(args, src_vocab_size, tgt_vocab_size):
     config = {
@@ -44,27 +65,32 @@ def train(train_dataloader, val_dataloader, model, criterion,
     
     # initiate logger for saving metrics
     logger = TrainingLogger(config)
-    logger.autolog()
+    # print("trying to enable autolog")
+    # logger.autolog()
+    # print("autolog enabled")
     # start training
     for epoch in range(1, config["num_epochs"]+1): # epochs are 1-indexed
+        print(f"epoch: {epoch}")
         # initialize timer
         start = time.time()
         # training
         train_loss, train_bleu = run_train_epoch(train_dataloader, 
+                                                 val_dataloader,
                                                  model, 
                                                  criterion, 
                                                  optimizer, 
                                                  scheduler, 
-                                                 config["accum_iter"])
+                                                 config["accum_iter"],
+                                                 logger)
         # validation
         val_loss, val_bleu = run_val_epoch(val_dataloader, model, criterion)
 
         # Accumulate loss history, train loss should be the latest train loss  
         # since validation is done at end of entire training epoch
-        logger.log('train_loss', train_loss)
-        logger.log('val_loss', val_loss)
-        logger.log('train_bleu', train_bleu)
-        logger.log('val_bleu', val_bleu)
+        # logger.log('train_loss', train_loss)
+        # logger.log('val_loss', val_loss)
+        # logger.log('train_bleu', train_bleu)
+        # logger.log('val_bleu', val_bleu)
 
         # print losses
         print(f"Epoch: {epoch} | "
@@ -78,21 +104,24 @@ def train(train_dataloader, val_dataloader, model, criterion,
         #    f'{config["model_dir"]}/N{config["N"]}/epoch_{epoch:02d}.pt')
 
         # plot and save loss curves
-        logger.saveplot(
-            metric_names=['train_loss', 'val_loss'], 
-            title='Losses',
-            title_dict={k:config[k] for k in ['batch_size', 'N', 'dataset_size']}, 
-            plot_type='loss',
-        )
-        logger.saveplot(
-            metric_names=['train_bleu', 'val_bleu'], 
-            title='BLEU scores',
-            title_dict={k:config[k] for k in ['batch_size', 'N', 'dataset_size']}, 
-            plot_type='bleu',
-        )
+        # log loss v/s weight updates
+        logger.saveplot(epoch, 
+                        metric_names=['train_loss', 'val_loss'], 
+                        title='Loss', 
+                        title_dict={k:config[k] for k in ['batch_size', 'N', 'dataset_size']}, 
+                        plot_type='loss', 
+                        xlabel='Weight Update',
+                        )
+        logger.saveplot(epoch,
+                        metric_names=['train_bleu', 'val_bleu'], 
+                        title='BLEU', 
+                        title_dict={k:config[k] for k in ['batch_size', 'N', 'dataset_size']}, 
+                        plot_type='bleu', 
+                        xlabel='Weight Update',
+                        )
 
-def run_train_epoch(train_dataloader, model, criterion, optimizer, 
-                    scheduler, accum_iter):
+def run_train_epoch(train_dataloader, val_dataloader, model, criterion, 
+                    optimizer, scheduler, accum_iter, logger):
     # put model in training mode
     model.train()
     # iterate over the training data and compute losses
@@ -116,6 +145,14 @@ def run_train_epoch(train_dataloader, model, criterion, optimizer,
         # accumulate loss and BLEU score
         total_loss += loss.detach().cpu().numpy()
         total_bleu += bleu
+        
+        # log train, val loss and bleu after every weight update
+        val_loss, val_bleu = run_val_epoch(val_dataloader, model, criterion)
+        logger.log("train_loss", loss.item())
+        logger.log("train_bleu", bleu)
+        logger.log("val_loss", val_loss)
+        logger.log("val_bleu", val_bleu)
+        
         # print metrics
         if i % (len(train_dataloader)//8) == 0:
             print(f"Batch: {i}/{len(train_dataloader)} \t|\t"
@@ -151,11 +188,12 @@ def run_val_epoch(val_dataloader, model, criterion):
     return epoch_loss, epoch_bleu
 
 if __name__ == "__main__":
+    print("start of the adventure")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--N", type=int, default=6)
+    parser.add_argument("--epochs", type=int, default=2000)
+    parser.add_argument("--N", type=int, default=1)
     parser.add_argument("--language_pair", type=tuple, default=("de", "en"))
-    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--max_padding", type=int, default=20)
     parser.add_argument("--dataset_name", type=str, choices=["wmt14", "m30k"])
     parser.add_argument("--cache", action="store_true")
@@ -163,7 +201,7 @@ if __name__ == "__main__":
     parser.add_argument("--experiment_name")
     parser.add_argument("--random_seed", type=int, default=40)
     args = parser.parse_args()
-    device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # if missing, create directories required for saving artifacts
     DirectoryCreator.create_dirs(['saved_tokenizers', 

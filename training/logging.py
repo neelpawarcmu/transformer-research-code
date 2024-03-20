@@ -1,8 +1,8 @@
 from collections import defaultdict
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
+from matplotlib.ticker import MaxNLocator
 import os
-import mlflow
+# import mlflow
 
 class DirectoryCreator:
     base_path = 'artifacts'
@@ -25,6 +25,7 @@ class DirectoryCreator:
 
 class BaseLogger:
     def __init__(self, config):
+        print("baselogger init starting")
         self.config = config
         self.tracking_uri = "http://127.0.0.1:8080"
         self.experiment_name = config["experiment_name"]
@@ -33,11 +34,12 @@ class BaseLogger:
                                                          "random_seed",
                                                          ]])
         self.run_name = run_name
-        self.client = mlflow.tracking.MlflowClient()
-        mlflow.start_run()
+        # self.client = mlflow.tracking.MlflowClient()
+        # mlflow.start_run()
+        print("baselogger init done")
 
-    def autolog(self):
-        mlflow.autolog()
+    # def autolog(self):
+    #     mlflow.autolog()
     
     def upload_artifacts(self):
         raise NotImplementedError
@@ -54,14 +56,14 @@ class TrainingLogger(BaseLogger):
         '''
         self.metrics[name].append(value)
 
-    def saveplot(self, metric_names, title, title_dict, plot_type):
+    def saveplot(self, epoch_num, metric_names, title, title_dict, plot_type, xlabel="Epoch"):
         '''
         Plots and saves the metric history for specified list of metrics.
         '''
 
         # compute plot limits
         if plot_type == 'loss':
-            ylim = (0, 8)
+            ylim = (0, 9)
         elif plot_type == 'bleu':
             ylim = (0, 1)
         else: 
@@ -72,32 +74,37 @@ class TrainingLogger(BaseLogger):
             [f"{k.replace('_', ' ').capitalize()}: {v}" 
              for k, v in title_dict.items()]
         )
-        
-        plt.figure()
+    
+        fig, ax = plt.subplots()
         for name in metric_names:
             label = name.replace('_',' ').capitalize()
             metric_history = self.metrics[name]
-            plt.ylim(*ylim)
-            plt.xlim(1, len(metric_history))
-            plt.plot(range(1, len(metric_history)+1), metric_history, label=label)
-        plt.xlabel("Epoch")
-        plt.ylabel("Metric")
-        plt.title(composed_title)
-        plt.grid(visible=True)
-        plt.autoscale(False)
-        plt.legend()
-        # whole number ticks
-        plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
+            ax.plot(range(1, len(metric_history)+1), metric_history, label=label)
+        ax.set_ylim(ylim)
+        ax.set_xlim(1, len(metric_history))
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(plot_type.capitalize())
+        ax.set_title(composed_title, y=1.08)
+
+        # plot secondary axis of epochs
+        ax2 = ax.twiny()
+        ax2.set_xlim(1, epoch_num)
+        ax2.set_xlabel("Epoch")
+        # ax2.set_xticks(range(1, epoch_num + 1))
+        ax.grid(visible=True)
+        ax.legend()
+
         # save plot
         save_path = (f"artifacts/loss_curves/"
-                     f"N{title_dict['N']}/{title.lower().replace(' ', '_')}"
-                     f"_dataset_size_{title_dict['dataset_size']}.png")
+                    f"N{title_dict['N']}/{title.lower().replace(' ', '_')}"
+                    f"_dataset_size_{title_dict['dataset_size']}.png")
         plt.show()
         plt.pause(0.01)
-        plt.savefig(save_path)
+        fig.savefig(save_path)
         plt.close()
-        mlflow.log_artifacts(f"artifacts/loss_curves/N{self.config['N']}")
-        mlflow.end_run()
+        # mlflow.log_artifacts(f"artifacts/loss_curves/N{self.config['N']}")
+        # mlflow.end_run()
 
 class TranslationLogger(BaseLogger):
     def __init__(self, config):

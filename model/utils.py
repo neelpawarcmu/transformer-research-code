@@ -1,31 +1,29 @@
-from model.full_model import TransformerModel
 from numerize.numerize import numerize as nu
 
+# def create_model(config):
+#     model =  TransformerModel(config["src_vocab_size"], 
+#                               config["tgt_vocab_size"], 
+#                               config["N"], 
+#                               config["d_model"], 
+#                               config["d_ff"], 
+#                               config["h"], 
+#                               config["dropout_prob"])
+#     for layer in [model, 
+#                   model.input_embedding_layer, 
+#                   model.output_embedding_layer, 
+#                   model.input_positional_enc_layer, 
+#                   model.output_positional_enc_layer,
+#                   model.encoder_stack, 
+#                   model.decoder_stack, 
+#                   model.linear_and_softmax_layers]:
+#         count_params(layer)
+#     return model
 
-def create_model(config):
-    model =  TransformerModel(config["src_vocab_size"], 
-                              config["tgt_vocab_size"], 
-                              config["N"], 
-                              config["d_model"], 
-                              config["d_ff"], 
-                              config["h"], 
-                              config["dropout_prob"])
-    for layer in [model, 
-                  model.input_embedding_layer, 
-                  model.output_embedding_layer, 
-                  model.input_positional_enc_layer, 
-                  model.output_positional_enc_layer,
-                  model.encoder_stack, 
-                  model.decoder_stack, 
-                  model.linear_and_softmax_layers]:
-        count_params(layer)
-    return model
-
-def load_model(config, pretrained=False, model_path=None):
-    model =  create_model(config)
-    if pretrained:
-        model.load_state_dict(model_path)
-    return model
+# def load_model(config, pretrained=False, model_path=None):
+#     model =  create_model(config)
+#     if pretrained:
+#         model.load_state_dict(model_path)
+#     return model
 
 def count_params(model):
     num_param_matrices, num_params, num_trainable_params = 0, 0, 0
