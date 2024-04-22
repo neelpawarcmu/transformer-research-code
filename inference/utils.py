@@ -60,17 +60,18 @@ class BleuUtils:
         self.tokenizer_src = tokenizer_src
         self.tokenizer_tgt = tokenizer_tgt
     
-    @classmethod
-    def compute_bleu(cls, results):
-        """
-        Compute a bleu score for a group of sentence translations
-        TODO: deprecate this
-        """
-        ground_truths = [[res[1].split()] for res in results] # ground truth
-        predictions = [res[2].split() for res in results] # list of list of label tokens
-        return bleu_score(predictions, ground_truths)
+    # @classmethod
+    # def compute_bleu(cls, results):
+    #     """
+    #     Compute a bleu score for a group of sentence translations
+    #     TODO: deprecate this
+    #     """
+    #     ground_truths = [[res[1].split()] for res in results] # ground truth
+    #     predictions = [res[2].split() for res in results] # list of list of label tokens
+    #     return bleu_score(predictions, ground_truths)
      
     def compute_batch_bleu(self, predictions, tgt_label):
+        # return -1 #TODO: remove later
         # convert token tensor to list of sentences
         predicted_sentences = [SentenceProcessor.tokens_to_sentence(
             predictions[i], self.tokenizer_tgt) 

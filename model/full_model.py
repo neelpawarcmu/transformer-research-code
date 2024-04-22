@@ -327,7 +327,6 @@ class MultiHeadedAttentionModule(nn.Module):
         derived_queries = partition_across_attn_heads(self.w_q(query))
         derived_keys = partition_across_attn_heads(self.w_k(key))
         derived_values = partition_across_attn_heads(self.w_v(value))
-        
         # compute attention
         attention_outputs, attention_weightings = \
             self.attention_fn(derived_queries, derived_keys, derived_values, 

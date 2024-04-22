@@ -1,0 +1,229 @@
+------------------------------------------------------------
+TransformerModel
+Number of parameter matrices: 50
+Number of parameters: 53.01M
+Number of trainable parameters: 53.01M
+------------------------------------------------------------
+EmbeddingLayer
+Number of parameter matrices: 1
+Number of parameters: 15.93M
+Number of trainable parameters: 15.93M
+------------------------------------------------------------
+EmbeddingLayer
+Number of parameter matrices: 1
+Number of parameters: 14.85M
+Number of trainable parameters: 14.85M
+------------------------------------------------------------
+PositionalEncodingLayer
+Number of parameter matrices: 0
+Number of parameters: 0
+Number of trainable parameters: 0
+------------------------------------------------------------
+PositionalEncodingLayer
+Number of parameter matrices: 0
+Number of parameters: 0
+Number of trainable parameters: 0
+------------------------------------------------------------
+EncoderStack
+Number of parameter matrices: 18
+Number of parameters: 3.15M
+Number of trainable parameters: 3.15M
+------------------------------------------------------------
+DecoderStack
+Number of parameter matrices: 28
+Number of parameters: 4.21M
+Number of trainable parameters: 4.21M
+------------------------------------------------------------
+LinearAndSoftmaxLayers
+Number of parameter matrices: 2
+Number of parameters: 14.88M
+Number of trainable parameters: 14.88M
+loading dataset wmt14
+Loaded data from artifacts/saved_data/preprocd_wmt14_299999.pt
+Number of sentence pairs: 
+Training: 239999        Validation: 30000       Test: 30000
+Epoch: 1
+> /ocean/projects/cis230090p/npawar/research/transformer-research-code/train_model.py(133)run_train_epoch()
+-> output_logprobabilities = model.forward(batch.src,
+(Pdb) batch
+<data.runtime_loaders.Batch object at 0x1534a9432d90>
+(Pdb) batch.src.shape
+torch.Size([16, 20])
+(Pdb) batch.tgt_shifted_right.shape
+torch.Size([16, 19])
+(Pdb) batch.decoder_attn_mask.shape
+torch.Size([16, 19, 19])
+(Pdb) batch.decoder_attn_mask[0]
+tensor([[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]],
+       device='cuda:0')
+(Pdb) model
+TransformerModel(
+  (input_embedding_layer): EmbeddingLayer(
+    (lookup_table): Embedding(31104, 512)
+  )
+  (output_embedding_layer): EmbeddingLayer(
+    (lookup_table): Embedding(28998, 512)
+  )
+  (input_positional_enc_layer): PositionalEncodingLayer(
+    (dropout_layer): Dropout(p=0.1, inplace=False)
+  )
+  (output_positional_enc_layer): PositionalEncodingLayer(
+    (dropout_layer): Dropout(p=0.1, inplace=False)
+  )
+  (encoder_stack): EncoderStack(
+    (encoder_layers): ModuleList(
+      (0): EncoderLayer(
+        (self_attn_module): MultiHeadedAttentionModule(
+          (w_q): Linear(in_features=512, out_features=512, bias=True)
+          (w_k): Linear(in_features=512, out_features=512, bias=True)
+          (w_v): Linear(in_features=512, out_features=512, bias=True)
+          (linear_layer): Linear(in_features=512, out_features=512, bias=True)
+          (dropout_layer): Dropout(p=0.1, inplace=False)
+        )
+        (self_attn_sublayer): Sublayer(
+          (norm_layer): LayerNorm()
+          (dropout_layer): Dropout(p=0.1, inplace=False)
+        )
+        (pos_ff_sublayer): Sublayer(
+          (workhorse): PositionwiseFeedForwardNetwork(
+            (linear_layer_1): Linear(in_features=512, out_features=2048, bias=True)
+            (relu): ReLU(inplace=True)
+            (linear_layer_2): Linear(in_features=2048, out_features=512, bias=True)
+            (dropout_layer): Dropout(p=0.1, inplace=False)
+          )
+          (norm_layer): LayerNorm()
+          (dropout_layer): Dropout(p=0.1, inplace=False)
+        )
+      )
+    )
+    (norm_layer): LayerNorm()
+  )
+  (decoder_stack): DecoderStack(
+    (decoder_layers): ModuleList(
+      (0): DecoderLayer(
+        (self_attn_module): MultiHeadedAttentionModule(
+          (w_q): Linear(in_features=512, out_features=512, bias=True)
+          (w_k): Linear(in_features=512, out_features=512, bias=True)
+          (w_v): Linear(in_features=512, out_features=512, bias=True)
+          (linear_layer): Linear(in_features=512, out_features=512, bias=True)
+          (dropout_layer): Dropout(p=0.1, inplace=False)
+        )
+        (self_attn_sublayer): Sublayer(
+          (norm_layer): LayerNorm()
+          (dropout_layer): Dropout(p=0.1, inplace=False)
+        )
+        (cross_attn_module): MultiHeadedAttentionModule(
+          (w_q): Linear(in_features=512, out_features=512, bias=True)
+          (w_k): Linear(in_features=512, out_features=512, bias=True)
+          (w_v): Linear(in_features=512, out_features=512, bias=True)
+          (linear_layer): Linear(in_features=512, out_features=512, bias=True)
+          (dropout_layer): Dropout(p=0.1, inplace=False)
+        )
+        (cross_attn_sublayer): Sublayer(
+          (norm_layer): LayerNorm()
+          (dropout_layer): Dropout(p=0.1, inplace=False)
+        )
+        (pos_ff_sublayer): Sublayer(
+          (workhorse): PositionwiseFeedForwardNetwork(
+            (linear_layer_1): Linear(in_features=512, out_features=2048, bias=True)
+            (relu): ReLU(inplace=True)
+            (linear_layer_2): Linear(in_features=2048, out_features=512, bias=True)
+            (dropout_layer): Dropout(p=0.1, inplace=False)
+          )
+          (norm_layer): LayerNorm()
+          (dropout_layer): Dropout(p=0.1, inplace=False)
+        )
+      )
+    )
+    (norm_layer): LayerNorm()
+  )
+  (linear_and_softmax_layers): LinearAndSoftmaxLayers(
+    (linear_layer): Linear(in_features=512, out_features=28998, bias=True)
+    (softmax_layer): LogSoftmax(dim=-1)
+  )
+)
+(Pdb) batch.src.shape
+torch.Size([16, 20])
+(Pdb) s = batch.src
+> /ocean/projects/cis230090p/npawar/research/transformer-research-code/train_model.py(134)run_train_epoch()
+-> batch.tgt_shifted_right,
+(Pdb) src = batch.src
+(Pdb) emb = model.input_embedding_layer(src)
+(Pdb) emb.shape
+torch.Size([16, 20, 512])
+(Pdb) encout = model.encoder_stack(emb)
+(Pdb) encout.shape
+torch.Size([16, 20, 512])
+(Pdb) tgt = batch.tgt_shifted_right
+(Pdb) decoder_attn_mask = batch.decoder_attn_mask
+__________________________________________________
+
+(Pdb) src.shape
+torch.Size([16, 20])
+(Pdb) tgt.shape
+torch.Size([16, 19])
+(Pdb) decoder_attn_mask.shape
+torch.Size([16, 19, 19])
+(Pdb) src_embeddings = model.input_embedding_layer(src)
+(Pdb) src_embeddings.shape
+torch.Size([16, 20, 512])
+(Pdb) src_embeddings_with_positions = model.input_positional_enc_layer(src_embeddings)
+(Pdb) src_embeddings_with_positions.shape
+torch.Size([16, 20, 512])
+(Pdb) encoder_stack_output = model.encoder_stack(src_embeddings_with_positions)
+(Pdb) encoder_stack_output.shape
+torch.Size([16, 20, 512])
+(Pdb) memory = encoder_stack_output
+(Pdb) tgt_embeddings = model.output_embedding_layer(tgt)
+(Pdb) tgt_embeddings.shape
+torch.Size([16, 19, 512])
+(Pdb) tgt_embeddings_with_positions = model.output_positional_enc_layer(tgt_embeddings)
+(Pdb) tgt_embeddings_with_positions.shape
+torch.Size([16, 19, 512])
+
+
+                                                                                           slurmstepd: error: *** STEP 23170538.interactive ON v007 CANCELLED AT 2024-03-31T21:08:21 DUE TO TIME LIMIT ***
+srun: Job step aborted: Waiting up to 302 seconds for job step to finish.
+(Pdb) tgt_embeddings_with_positions.shape
+torch.Size([16, 19, 512])
+(Pdb) decoder_stack_output = model.decoder_stack(tgt_embeddings_with_positions, memory, decoder_attn_mask)
+(Pdb) decoder_stack_output.shape
+torch.Size([16, 19, 512])
+(Pdb) decoder_stack_output.shape
+
+(Pdb) input = torch.zeros((22,23,24,25,512))
+(Pdb) device
+*** NameError: name 'device' is not defined
+(Pdb) device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+(Pdb) input = input.to(device)
+(Pdb) input.shape
+torch.Size([22, 23, 24, 25, 512])
+(Pdb) output = self.linear_and_softmax_layers(input)
+*** RuntimeError: CUDA out of memory. Tried to allocate 32.80 GiB (GPU 0; 31.74 GiB total capacity; 886.85 MiB already allocated; 29.49 GiB free; 910.00 MiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
+(Pdb) input = torch.zeros((2,3,4,5,512))
+(Pdb) input = input.to(device)
+(Pdb) output = self.linear_and_softmax_layers(input)
+(Pdb) output.shape
+torch.Size([2, 3, 4, 5, 28998])
+(Pdb) decoder_stack_output.shape
+torch.Size([16, 19, 512])
+(Pdb) output_logprobabilities.shape
+torch.Size([16, 19, 28998])

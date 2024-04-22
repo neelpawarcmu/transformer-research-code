@@ -1,3 +1,4 @@
+import os
 import torch
 from torch.utils.data import DataLoader
 from data.download import DataDownloader
@@ -111,7 +112,7 @@ def load_datasets(name, language_pair, tokenizer_src, tokenizer_tgt,
 
     
 def load_dataloaders(train_dataset, val_dataset, test_dataset, 
-                     batch_size, shuffle=True):
+                     batch_size, shuffle=True, num_workers=1):
     '''
     A utility function that takes runtime dataset splits and creates 
     corresponding train, validation and test dataloaders that consume the 
@@ -120,12 +121,22 @@ def load_dataloaders(train_dataset, val_dataset, test_dataset,
     train_dataloader = DataLoader(dataset=train_dataset, 
                                   batch_size=batch_size, 
                                   shuffle=shuffle,
-                                  collate_fn=train_dataset.collate_fn)
+                                  collate_fn=train_dataset.collate_fn,
+                                #   num_workers=5,
+                                #   persistent_workers=True,
+                                #   pin_memory=True,
+                                #   prefetch_factor=3,
+                                )
     
     val_dataloader = DataLoader(dataset=val_dataset, 
                                 batch_size=batch_size, 
                                 shuffle=shuffle,
-                                collate_fn=val_dataset.collate_fn)
+                                collate_fn=val_dataset.collate_fn,
+                                # num_workers=5,
+                                # persistent_workers=True,
+                                # pin_memory=True,
+                                # prefetch_factor=3,
+                                )
     
     test_dataloader = DataLoader(dataset=test_dataset, 
                                 batch_size=batch_size, 

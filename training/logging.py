@@ -1,8 +1,11 @@
+import os
+import mlflow
+import numpy as np
 from collections import defaultdict
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-import os
-# import mlflow
+import scipy.interpolate as interp
+from torch.utils.tensorboard import SummaryWriter
 
 class DirectoryCreator:
     base_path = 'artifacts'
@@ -25,7 +28,6 @@ class DirectoryCreator:
 
 class BaseLogger:
     def __init__(self, config):
-        print("baselogger init starting")
         self.config = config
         self.tracking_uri = "http://127.0.0.1:8080"
         self.experiment_name = config["experiment_name"]
@@ -34,9 +36,10 @@ class BaseLogger:
                                                          "random_seed",
                                                          ]])
         self.run_name = run_name
-        # self.client = mlflow.tracking.MlflowClient()
-        # mlflow.start_run()
-        print("baselogger init done")
+        self.client = mlflow.tracking.MlflowClient()
+        self.writer = SummaryWriter()
+        mlflow.start_run()
+        mlflow.set_experiment(self.experiment_name)
 
     # def autolog(self):
     #     mlflow.autolog()
@@ -50,11 +53,14 @@ class TrainingLogger(BaseLogger):
         super().__init__(config)
         self.metrics = defaultdict(list)
 
-    def log(self, name, value):
+    def log(self, name, value, step):
         '''
         Appends metric to existing log of its history over training.
         '''
         self.metrics[name].append(value)
+        mlflow.log_metric(name, value)
+        name_for_tensorboard = "/".join(name.split("_")[::-1])
+        self.writer.add_scalar(name_for_tensorboard, value, step)
 
     def saveplot(self, epoch_num, metric_names, title, title_dict, plot_type, xlabel="Epoch"):
         '''
@@ -74,11 +80,15 @@ class TrainingLogger(BaseLogger):
             [f"{k.replace('_', ' ').capitalize()}: {v}" 
              for k, v in title_dict.items()]
         )
+
+        max_length = max(
+            [len(history) for _, history in self.metrics.items()]
+        )
     
         fig, ax = plt.subplots()
         for name in metric_names:
             label = name.replace('_',' ').capitalize()
-            metric_history = self.metrics[name]
+            metric_history = self.interpolate(self.metrics[name], max_length)
             ax.plot(range(1, len(metric_history)+1), metric_history, label=label)
         ax.set_ylim(ylim)
         ax.set_xlim(1, len(metric_history))
@@ -103,8 +113,22 @@ class TrainingLogger(BaseLogger):
         plt.pause(0.01)
         fig.savefig(save_path)
         plt.close()
-        # mlflow.log_artifacts(f"artifacts/loss_curves/N{self.config['N']}")
-        # mlflow.end_run()
+        mlflow.log_artifacts(f"artifacts/loss_curves/N{self.config['N']}")
+        self.writer.flush()
+
+    def interpolate(self, array, target_length):
+        
+        mesh = interp.interp1d(np.arange(len(array)), array)
+        interpolated_array = mesh(np.linspace(0,len(array)-1,target_length)).tolist()
+        return interpolated_array
+
+    def close(self):
+        mlflow.end_run()
+        self.writer.close()
+
+class AutoTrainingLogger(TrainingLogger):
+    def __init__(self, config):
+        super().__init__(config)
 
 class TranslationLogger(BaseLogger):
     def __init__(self, config):

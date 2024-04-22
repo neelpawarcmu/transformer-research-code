@@ -1,18 +1,26 @@
-print("start of imports")
-import argparse
+import os
 import time
 import json
 import torch
+import torch.nn as nn
+import argparse
 from torch.optim.lr_scheduler import LambdaLR
+
 from vocab.vocab_utils import build_tokenizers
 from vocab.bert_tokenizer_utils import build_tokenizers
 from data.runtime_loaders import load_datasets, load_dataloaders
+
 from training.logging import DirectoryCreator, TrainingLogger
 from training.loss import LabelSmoothing, SimpleLossCompute
 from training.utils import get_learning_rate
 from inference.utils import BleuUtils
 from model.full_model import TransformerModel
 from model.utils import count_params
+from multiprocessing import set_start_method
+try:
+    set_start_method('spawn')
+except RuntimeError:
+    pass
 
 def create_model(config):
     model =  TransformerModel(config["src_vocab_size"], 
@@ -65,12 +73,9 @@ def train(train_dataloader, val_dataloader, model, criterion,
     
     # initiate logger for saving metrics
     logger = TrainingLogger(config)
-    # print("trying to enable autolog")
-    # logger.autolog()
-    # print("autolog enabled")
     # start training
     for epoch in range(1, config["num_epochs"]+1): # epochs are 1-indexed
-        print(f"epoch: {epoch}")
+        print(f"Epoch: {epoch}")
         # initialize timer
         start = time.time()
         # training
@@ -88,9 +93,9 @@ def train(train_dataloader, val_dataloader, model, criterion,
         # Accumulate loss history, train loss should be the latest train loss  
         # since validation is done at end of entire training epoch
         # logger.log('train_loss', train_loss)
-        # logger.log('val_loss', val_loss)
         # logger.log('train_bleu', train_bleu)
-        # logger.log('val_bleu', val_bleu)
+        logger.log('val_loss', val_loss, epoch)
+        logger.log('val_bleu', val_bleu, epoch)
 
         # print losses
         print(f"Epoch: {epoch} | "
@@ -119,6 +124,7 @@ def train(train_dataloader, val_dataloader, model, criterion,
                         plot_type='bleu', 
                         xlabel='Weight Update',
                         )
+    print("Training complete")
 
 def run_train_epoch(train_dataloader, val_dataloader, model, criterion, 
                     optimizer, scheduler, accum_iter, logger):
@@ -126,6 +132,7 @@ def run_train_epoch(train_dataloader, val_dataloader, model, criterion,
     model.train()
     # iterate over the training data and compute losses
     total_loss, total_bleu = 0, 0
+    print_frequency = max(len(train_dataloader) // 8, 1) # for printing progress
     for i, batch in enumerate(train_dataloader):
         output_logprobabilities = model.forward(batch.src, 
                                                 batch.tgt_shifted_right,
@@ -147,19 +154,20 @@ def run_train_epoch(train_dataloader, val_dataloader, model, criterion,
         total_bleu += bleu
         
         # log train, val loss and bleu after every weight update
-        val_loss, val_bleu = run_val_epoch(val_dataloader, model, criterion)
-        logger.log("train_loss", loss.item())
-        logger.log("train_bleu", bleu)
-        logger.log("val_loss", val_loss)
-        logger.log("val_bleu", val_bleu)
+        # val_loss, val_bleu = run_val_epoch(val_dataloader, model, criterion)
+        logger.log("train_loss", loss.item(), i)
+        logger.log("train_bleu", bleu, i)
+        # logger.log("val_loss", None, i)
+        # logger.log("val_bleu", None, i)
         
         # print metrics
-        if i % (len(train_dataloader)//8) == 0:
-            print(f"Batch: {i}/{len(train_dataloader)} \t|\t"
+        if i % print_frequency == 0:
+            print(f"Batch: {i+1}/{len(train_dataloader)} \t|\t"
                   f"Training loss: {loss.detach().cpu().numpy():.3f} \t|\t"
                   f"BLEU: {bleu:.3f} \t|\t"
                   f"Learning rate: {optimizer.param_groups[0]['lr']:.2e}")
-    
+
+        del batch
     # average the metrics
     epoch_loss = total_loss / len(train_dataloader)
     epoch_bleu = total_bleu / len(train_dataloader)
@@ -188,18 +196,18 @@ def run_val_epoch(val_dataloader, model, criterion):
     return epoch_loss, epoch_bleu
 
 if __name__ == "__main__":
-    print("start of the adventure")
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=2000)
     parser.add_argument("--N", type=int, default=1)
     parser.add_argument("--language_pair", type=tuple, default=("de", "en"))
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--max_padding", type=int, default=20)
-    parser.add_argument("--dataset_name", type=str, choices=["wmt14", "m30k"])
+    parser.add_argument("--dataset_name", type=str, choices=["wmt14", "m30k"], default="wmt14")
     parser.add_argument("--cache", action="store_true")
     parser.add_argument("--dataset_size", type=int, default=5000000)
-    parser.add_argument("--experiment_name")
     parser.add_argument("--random_seed", type=int, default=40)
+    parser.add_argument("--experiment_name", type=str, default="default experiment")
+    # parser.add_argument("--run_name", type=str, default="default run")
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -208,14 +216,13 @@ if __name__ == "__main__":
                                   'saved_data',
                                   f'saved_models/N{args.N}', 
                                   f'loss_curves/N{args.N}'])
-
     # load tokenizers and vocabulary
     tokenizer_src, tokenizer_tgt = build_tokenizers(args.language_pair)
     config = create_config(args, len(tokenizer_src.vocab), len(tokenizer_tgt.vocab))
 
     # initialize model
     model = create_model(config)
-    model = model.to(device)
+    model = nn.DataParallel(model).to(device) # 
     
     # load data
     train_dataset, val_dataset, test_dataset = load_datasets(config["dataset_name"],
@@ -232,8 +239,8 @@ if __name__ == "__main__":
                                                                          val_dataset, 
                                                                          test_dataset,
                                                                          config["batch_size"],
-                                                                         shuffle=True)
-    
+                                                                         shuffle=True,
+                                                                         num_workers=os.cpu_count())
     # create loss criterion, learning rate optimizer and scheduler
     label_smoothing = LabelSmoothing(len(tokenizer_tgt.vocab), 
                                      tokenizer_tgt.pad_token_id, 0.1)
@@ -248,6 +255,5 @@ if __name__ == "__main__":
     
     # initialize translation utils TODO: check if this needs to go somewhere else / needs refactoring
     bleu_utils = BleuUtils(tokenizer_src, tokenizer_tgt)
-
     # train
     train(train_dataloader, val_dataloader, model, criterion, optimizer, scheduler, config)
