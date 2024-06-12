@@ -162,27 +162,41 @@ class DecoderStack(nn.Module):
 
 class Sublayer(nn.Module):
     """
-    Sublayer accepts a workhorse (either a closure with a self attention
-    layer inside, or a position-wise feed forward layer)
-    as an argument and composes it with the following operations:
+    Sublayer accepts a workhorse (either a self attention module, a cross attention module,
+    or a position-wise feed forward module) as an argument and composes it with the following 
+    operations:
     x + Dropout(Workhorse(LayerNorm(x)))
     """
-    def __init__(self, workhorse, size, dropout_prob):
+    def __init__(self, sublayer_type, workhorse, size, dropout_prob):
         super(Sublayer, self).__init__()
-        self.workhorse = workhorse
+        self.sublayer_type = sublayer_type # "attention" or "feedforward"
         self.norm_layer = LayerNorm(size)
+        self.workhorse = workhorse  
         self.dropout_layer = nn.Dropout(p = dropout_prob)
 
     def forward(self, x, mask=None, memory=None): # x is representation / embedding
         normed_x = self.norm_layer(x)
-        if mask is not None: # decoder self attention sublayer
-            workhorse_output = self.workhorse(normed_x, mask)
-        elif memory is not None: # decoder cross attention sublayer
-            workhorse_output = self.workhorse(normed_x, memory)
-        else: # encoder or feedforward sublayer
+
+        if self.sublayer_type == "attention":
+            # attention sublayers
+            if memory is None: # self attention or masked self attention
+                workhorse_output = self.workhorse(query = normed_x, 
+                                                  key = normed_x, 
+                                                  value = normed_x,
+                                                  attention_mask = mask)
+            else: # cross attention
+                workhorse_output = self.workhorse(query = normed_x, 
+                                                  key = memory, 
+                                                  value = memory)
+        elif self.sublayer_type == "feedforward":
+            # positionwise feedforward
             workhorse_output = self.workhorse(normed_x)
+        else:
+            raise ValueError("Invalid configuration for Sublayer forward method")
+
         # apply dropout
         dropout_output = self.dropout_layer(workhorse_output)
+
         # residual connection
         residual_output = x + dropout_output
         return residual_output
@@ -214,21 +228,23 @@ class EncoderLayer(nn.Module):
 
         # Initialize self attention network
         # note that we save as class variable (self.) only for torch functionality
-        self.self_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob)
+        self_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob) # TODO: "module" or "workhorse"?
 
         # Create self attention sublayer:
         #   Create a closure with self attention module inside.
         #   Encoder layers do not use the memory argument, because k and v are
         #   the input from the previous layer
-        tokenwise_self_attn_workhorse = lambda x: \
-             self.self_attn_module(query =  x,
-                                   key = x,
-                                   value = x)
-        self.self_attn_sublayer = Sublayer(tokenwise_self_attn_workhorse, d_model, dropout_prob)
+        self.self_attn_sublayer = Sublayer(sublayer_type="attention", 
+                                           workhorse=self_attn_module,
+                                           size=d_model, 
+                                           dropout_prob=dropout_prob)
 
         # create feedforward sublayer
-        pos_ff_workhorse = PositionwiseFeedForwardNetwork(d_model, d_ff, dropout_prob)
-        self.pos_ff_sublayer = Sublayer(pos_ff_workhorse, d_model, dropout_prob)
+        pos_ff_module = PositionwiseFeedForwardNetwork(d_model, d_ff, dropout_prob) # TODO: "module" or "workhorse"?
+        self.pos_ff_sublayer = Sublayer(sublayer_type="feedforward", 
+                                        workhorse=pos_ff_module, 
+                                        size=d_model, 
+                                        dropout_prob=dropout_prob)
 
     def forward(self, x):
         self_attn_sublayer_output = self.self_attn_sublayer(x)
@@ -247,42 +263,43 @@ class DecoderLayer(nn.Module):
         super(DecoderLayer, self).__init__()
 
         # Create self attention sublayer:
-        #   Create a closure referencing a self attention layer.
+        #   Create a closure referencing a self attention layer. TODO: update this doc
         #   The self attention module of the decoder layer uses a mask
         #   to prevent positions from attending to subsequent positions.
-        self.self_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob)
-        tokenwise_self_attn_workhorse = lambda x, mask: \
-             self.self_attn_module(query =  x,
-                                   key = x,
-                                   value = x,
-                                   attention_mask = mask)
-        self.self_attn_sublayer = Sublayer(tokenwise_self_attn_workhorse, d_model, dropout_prob)
+        self_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob) # TODO: "module" or "workhorse"?
+        self.self_attn_sublayer = Sublayer(sublayer_type="attention", 
+                                           workhorse=self_attn_module,
+                                           size=d_model, 
+                                           dropout_prob=dropout_prob)
 
-        # Create cross attention sublayer:
+        # Create cross attention sublayer:TODO: update this doc
         #   Create a closure referencing a cross attention layer.
         #   "memory" indicates that decoder layer operates on the output embedding from the
         #   encoder stack as explained in section 3.2.3 of the paper.
-        self.cross_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob)
-        tokenwise_cross_attn_workhorse = lambda x, memory: \
-             self.cross_attn_module(query =  x,
-                                    key = memory,
-                                    value = memory)
-        self.cross_attn_sublayer = Sublayer(tokenwise_cross_attn_workhorse, d_model, dropout_prob)
+        cross_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob) # TODO: "module" or "workhorse"?
+        self.cross_attn_sublayer = Sublayer(sublayer_type="attention", 
+                                           workhorse=cross_attn_module,
+                                           size=d_model, 
+                                           dropout_prob=dropout_prob)
 
         # create feedforward sublayer
-        pos_ff_workhorse = PositionwiseFeedForwardNetwork(d_model, d_ff, dropout_prob)
-        self.pos_ff_sublayer = Sublayer(pos_ff_workhorse, d_model, dropout_prob)
+        pos_ff_module = PositionwiseFeedForwardNetwork(d_model, d_ff, dropout_prob) # TODO: "module" or "workhorse"?
+        self.pos_ff_sublayer = Sublayer(sublayer_type="feedforward", 
+                                        workhorse=pos_ff_module, 
+                                        size=d_model, 
+                                        dropout_prob=dropout_prob)
 
 
     def forward(self, x, memory, decoder_attn_mask):
         "Follow Figure 1 (right) for connections."
         # self attention
-        self_attn_sublayer_output = self.self_attn_sublayer(x, decoder_attn_mask)
+        self_attn_sublayer_output = self.self_attn_sublayer(x, 
+                                                            mask = decoder_attn_mask)
         # cross attention
-        cross_attn_sublayer_output = \
-            self.cross_attn_sublayer(self_attn_sublayer_output, memory)
+        cross_attn_sublayer_output = self.cross_attn_sublayer(self_attn_sublayer_output, 
+                                                             memory = memory)
         # feedforward network
-        pos_ff_sublayer_output = self.pos_ff_sublayer(cross_attn_sublayer_output)
+        pos_ff_sublayer_output = self.pos_ff_sublayer(x = cross_attn_sublayer_output)
 
         return pos_ff_sublayer_output
 
@@ -306,8 +323,8 @@ class MultiHeadedAttentionModule(nn.Module):
         self.w_q = nn.Linear(d_model, d_model)
         self.w_k = nn.Linear(d_model, d_model)
         self.w_v = nn.Linear(d_model, d_model)
-        self.linear_layer = nn.Linear(d_model, d_model)
         self.dropout_layer = nn.Dropout(p=dropout_prob)
+        self.linear_layer = nn.Linear(d_model, d_model)
 
     def forward(self, query, key, value, attention_mask=None):
         # The attention mask is not used in the encoder, and hence is only
@@ -383,8 +400,8 @@ class PositionwiseFeedForwardNetwork(nn.Module):
         super(PositionwiseFeedForwardNetwork, self).__init__()
         self.linear_layer_1 = nn.Linear(d_model, d_ff)
         self.relu = nn.ReLU(inplace=True)
-        self.linear_layer_2 = nn.Linear(d_ff, d_model)
         self.dropout_layer = nn.Dropout(dropout_prob)
+        self.linear_layer_2 = nn.Linear(d_ff, d_model)
 
     def forward(self, x):
         linear_1_output = self.linear_layer_1(x)

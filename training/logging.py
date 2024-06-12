@@ -62,11 +62,11 @@ class TrainingLogger(BaseLogger):
         name_for_tensorboard = "/".join(name.split("_")[::-1])
         self.writer.add_scalar(name_for_tensorboard, value, step)
 
-    def saveplot(self, epoch_num, metric_names, title, title_dict, plot_type, xlabel="Epoch"):
+    def saveplot(self, epoch_num, metric_names, title, title_dict, plot_type, xlabel="Epoch"): # TODO: there seems to be a plotting error coming up on thorin. Commiting code as is, and can investigate when psc is up
         '''
         Plots and saves the metric history for specified list of metrics.
         '''
-
+        return
         # compute plot limits
         if plot_type == 'loss':
             ylim = (0, 9)

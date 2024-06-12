@@ -39,6 +39,7 @@ def create_model(config):
                   model.decoder_stack, 
                   model.linear_and_softmax_layers]:
         count_params(layer)
+    model = nn.DataParallel(model) # enable running on multiple GPUs
     return model
 
 def create_config(args, src_vocab_size, tgt_vocab_size):
@@ -221,8 +222,7 @@ if __name__ == "__main__":
     config = create_config(args, len(tokenizer_src.vocab), len(tokenizer_tgt.vocab))
 
     # initialize model
-    model = create_model(config)
-    model = nn.DataParallel(model).to(device) # 
+    model = create_model(config).to(device) # 
     
     # load data
     train_dataset, val_dataset, test_dataset = load_datasets(config["dataset_name"],
