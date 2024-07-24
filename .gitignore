@@ -5,7 +5,8 @@ __pycache__
 *py~
 */*.pyc
 temp
-mlruns
+mlruns/
+runs/
 *.job
 *.out
 slurm*
