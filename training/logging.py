@@ -5,7 +5,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import scipy.interpolate as interp
-from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 class DirectoryCreator:
     base_path = 'artifacts'
@@ -37,12 +37,8 @@ class BaseLogger:
                                                          ]])
         self.run_name = run_name
         self.client = mlflow.tracking.MlflowClient()
-        self.writer = SummaryWriter()
         mlflow.start_run()
         mlflow.set_experiment(self.experiment_name)
-
-    # def autolog(self):
-    #     mlflow.autolog()
     
     def upload_artifacts(self):
         raise NotImplementedError
@@ -53,20 +49,17 @@ class TrainingLogger(BaseLogger):
         super().__init__(config)
         self.metrics = defaultdict(list)
 
-    def log(self, name, value, step):
+    def log_metric(self, name, value, step):
         '''
         Appends metric to existing log of its history over training.
         '''
         self.metrics[name].append(value)
         mlflow.log_metric(name, value)
-        name_for_tensorboard = "/".join(name.split("_")[::-1])
-        self.writer.add_scalar(name_for_tensorboard, value, step)
 
     def saveplot(self, epoch_num, metric_names, title, title_dict, plot_type, xlabel="Epoch"): # TODO: there seems to be a plotting error coming up on thorin. Commiting code as is, and can investigate when psc is up
         '''
         Plots and saves the metric history for specified list of metrics.
         '''
-        return
         # compute plot limits
         if plot_type == 'loss':
             ylim = (0, 9)
@@ -74,10 +67,10 @@ class TrainingLogger(BaseLogger):
             ylim = (0, 1)
         else: 
             raise ValueError(f"Invalid plot_type '{plot_type}'")
-        
+        format_fn = lambda x: f"{x:,}" if isinstance(x, int) else x
         composed_title = (" | ").join(
             [title] + 
-            [f"{k.replace('_', ' ').capitalize()}: {v}" 
+            [f"{k.replace('_', ' ').capitalize()}: {format_fn(v)}" 
              for k, v in title_dict.items()]
         )
 
@@ -114,7 +107,6 @@ class TrainingLogger(BaseLogger):
         fig.savefig(save_path)
         plt.close()
         mlflow.log_artifacts(f"artifacts/loss_curves/N{self.config['N']}")
-        self.writer.flush()
 
     def interpolate(self, array, target_length):
         
@@ -124,13 +116,46 @@ class TrainingLogger(BaseLogger):
 
     def close(self):
         mlflow.end_run()
-        self.writer.close()
 
 class AutoTrainingLogger(TrainingLogger):
     def __init__(self, config):
         super().__init__(config)
 
 class TranslationLogger(BaseLogger):
+    def __init__(self, config):
+        super().__init__(config)
+        self.src_sentences = []
+        self.tgt_sentences = []
+        self.pred_sentences = []
+        self.bleu_scores = []
+        # create directories required for saving artifacts
+        DirectoryCreator.add_dir(f"generated_translations/N{self.config['N']}/dataset_size_{self.config['dataset_size']}", 
+                                 include_base_path=True)
+
+    def log_sentence_batch(self, src_sentences, tgt_sentences, pred_sentences, bleu_score):
+        '''
+        Logs sentences like target sentence, predicted sentence and so on.
+        '''
+        self.src_sentences.append(src_sentences)
+        self.tgt_sentences.append(tgt_sentences)
+        self.pred_sentences.append(pred_sentences)
+        self.bleu_scores.append(bleu_score)
+
+    def save_as_txt(self, base_path, title, title_dict):
+        save_path = (base_path + 
+                     f"N{title_dict['N']}/dataset_size_{title_dict['dataset_size']}/{title_dict['dataset_name']}_epoch_{title_dict['epoch']:02d}.txt")
+        print(f"Saving translations to {save_path}")
+        with open(save_path, "w") as f:
+            avg_bleu = round(sum(self.bleu_scores) / len(self.bleu_scores), 4)
+            f.write(f"Average BLEU score: {avg_bleu}\n")
+            pbar = tqdm(zip(self.src_sentences, self.tgt_sentences, self.pred_sentences))
+            for i, (batch_src, batch_tgt, batch_pred) in enumerate(pbar):
+                f.write("-"*100 + f"\nBatch {i+1}:\n" + "-"*100 + "\n")
+                for j, (src, tgt, pred) in enumerate(zip(batch_src, batch_tgt, batch_pred)):
+                    f.write(f"Source: {src}\nTarget: {tgt}\nPredicted: {pred}\n")
+                    f.write(f"\n")
+                
+class OldTranslationLogger(BaseLogger):
     def __init__(self, config):
         super().__init__(config)
         self.sentences = defaultdict(list)

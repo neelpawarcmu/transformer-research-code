@@ -9,10 +9,10 @@ for n in `seq 1 $NLAYERS`; do
 done
 
 for i in $EPOCHS; do
-    python3 generate_ger_eng_translations.py --epoch $i --N 1 --num_examples 5 
-    python3 generate_ger_eng_translations.py --epoch $i --N 2 --num_examples 5 
-    python3 generate_ger_eng_translations.py --epoch $i --N 3 --num_examples 5 
-    python3 generate_ger_eng_translations.py --epoch $i --N 4 --num_examples 5 
-    python3 generate_ger_eng_translations.py --epoch $i --N 5 --num_examples 5 
-    python3 generate_ger_eng_translations.py --epoch $i --N 6 --num_examples 5
+    python3 translate.py --epoch $i --N 1 --num_examples 5 
+    python3 translate.py --epoch $i --N 2 --num_examples 5 
+    python3 translate.py --epoch $i --N 3 --num_examples 5 
+    python3 translate.py --epoch $i --N 4 --num_examples 5 
+    python3 translate.py --epoch $i --N 5 --num_examples 5 
+    python3 translate.py --epoch $i --N 6 --num_examples 5
 done

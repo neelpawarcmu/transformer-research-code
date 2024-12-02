@@ -17,16 +17,14 @@ class TransformerModel(nn.Module):
         '''
         super(TransformerModel, self).__init__()
 
-        # embedding layers
+        # Source (encoding) layers
         self.input_embedding_layer = EmbeddingLayer(src_vocab_size, d_model)
-        self.output_embedding_layer = EmbeddingLayer(tgt_vocab_size, d_model)
-
-        # positional encoding layers
         self.input_positional_enc_layer = PositionalEncodingLayer(d_model, dropout_prob)
-        self.output_positional_enc_layer = PositionalEncodingLayer(d_model, dropout_prob)
-
-        # encoder stack and decoder stack
         self.encoder_stack = EncoderStack(h, d_model, d_ff, dropout_prob, N)
+
+        # Target (decoding) layers
+        self.output_embedding_layer = EmbeddingLayer(tgt_vocab_size, d_model)
+        self.output_positional_enc_layer = PositionalEncodingLayer(d_model, dropout_prob)
         self.decoder_stack = DecoderStack(h, d_model, d_ff, dropout_prob, N)
 
         # linear and softmax layers
@@ -39,7 +37,7 @@ class TransformerModel(nn.Module):
                 nn.init.xavier_uniform_(p)
         
     def encode(self, src):
-        # embed and add positional encoding
+        # convert source tokens to embeddings and add positional encoding
         src_embeddings = self.input_embedding_layer(src)
         src_embeddings_with_positions = self.input_positional_enc_layer(src_embeddings)
         # encode
@@ -47,7 +45,7 @@ class TransformerModel(nn.Module):
         return encoder_stack_output
 
     def decode(self, tgt, memory, decoder_attn_mask):
-        # embed and add positional encoding
+        # convert target tokens to embeddings and add positional encoding
         tgt_embeddings = self.output_embedding_layer(tgt)
         tgt_embeddings_with_positions = self.output_positional_enc_layer(tgt_embeddings)
         # decode
@@ -59,7 +57,7 @@ class TransformerModel(nn.Module):
         encoder_stack_output = self.encode(src)
         # pass target tokens and encoder output through decoder
         decoder_stack_output = self.decode(tgt, encoder_stack_output, decoder_attn_mask)
-        # project decoder output to transformer output size of probabilities
+        # project decoder output to transformer output vocabulary size
         output_logprobabilities = self.linear_and_softmax_layers(decoder_stack_output)
         return output_logprobabilities
     
@@ -84,8 +82,6 @@ class PositionalEncodingLayer(nn.Module):
 
     def __init__(self, d_model, dropout_prob, max_len=5000):
         super(PositionalEncodingLayer, self).__init__()
-        self.dropout_layer = nn.Dropout(p=dropout_prob)
-
         # Compute the positional encodings once in log space.
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len).unsqueeze(1)
@@ -95,7 +91,10 @@ class PositionalEncodingLayer(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
+        # register buffer as a module parameter, so it gets saved with the model,
+        # but is not updated during backprop
         self.register_buffer("pe", pe)
+        self.dropout_layer = nn.Dropout(p=dropout_prob)
 
     def forward(self, x):
         x_with_position = x + self.pe[:, : x.size(1)].requires_grad_(False)
@@ -104,17 +103,14 @@ class PositionalEncodingLayer(nn.Module):
 
 class EncoderStack(nn.Module):
     "Core encoder is a stack of N layers"
-
     def __init__(self, h, d_model, d_ff, dropout_prob, N):
         super(EncoderStack, self).__init__()
-
         # create and stack encoder layers
         encoder_layer_list = []
         for i in range(N):
             encoder_layer_i = EncoderLayer(h, d_model, d_ff, dropout_prob)
             encoder_layer_list.append(encoder_layer_i)
         self.encoder_layers = nn.ModuleList(encoder_layer_list)
-
         # layer normalization
         self.norm_layer = LayerNorm(d_model)
 
@@ -126,7 +122,6 @@ class EncoderStack(nn.Module):
             layer_output = layer(layer_input)
             # this becomes input to next layer
             layer_input = layer_output
-
         normed_output = self.norm_layer(layer_output)
         return normed_output
 
@@ -137,14 +132,12 @@ class DecoderStack(nn.Module):
     """
     def __init__(self, h, d_model, d_ff, dropout_prob, N):
         super(DecoderStack, self).__init__()
-
         # create and stack decoder layers
         decoder_layer_list = []
         for i in range(N):
             decoder_layer_i = DecoderLayer(h, d_model, d_ff, dropout_prob)
             decoder_layer_list.append(decoder_layer_i)
         self.decoder_layers = nn.ModuleList(decoder_layer_list)
-
         # layer normalization
         self.norm_layer = LayerNorm(d_model)
 
@@ -155,7 +148,6 @@ class DecoderStack(nn.Module):
             layer_output = layer(layer_input, memory, decoder_attn_mask)
             # this becomes input to next layer
             layer_input = layer_output
-
         normed_output = self.norm_layer(layer_output)
         return normed_output
 
@@ -169,14 +161,13 @@ class Sublayer(nn.Module):
     """
     def __init__(self, sublayer_type, workhorse, size, dropout_prob):
         super(Sublayer, self).__init__()
-        self.sublayer_type = sublayer_type # "attention" or "feedforward"
         self.norm_layer = LayerNorm(size)
+        self.sublayer_type = sublayer_type # "attention" or "feedforward"
         self.workhorse = workhorse  
         self.dropout_layer = nn.Dropout(p = dropout_prob)
 
     def forward(self, x, mask=None, memory=None): # x is representation / embedding
         normed_x = self.norm_layer(x)
-
         if self.sublayer_type == "attention":
             # attention sublayers
             if memory is None: # self attention or masked self attention
@@ -203,7 +194,7 @@ class Sublayer(nn.Module):
 
 
 class LayerNorm(nn.Module):
-    "Construct a layernorm module (See citation for details)."
+    "Construct a layernorm module (See citation for details)." # TODO: citation
 
     def __init__(self, num_features, eps=1e-6):
         super(LayerNorm, self).__init__()
@@ -225,20 +216,16 @@ class EncoderLayer(nn.Module):
 
     def __init__(self, h, d_model, d_ff, dropout_prob):
         super(EncoderLayer, self).__init__()
-
         # Initialize self attention network
-        # note that we save as class variable (self.) only for torch functionality
         self_attn_module = MultiHeadedAttentionModule(h, d_model, dropout_prob) # TODO: "module" or "workhorse"?
-
         # Create self attention sublayer:
-        #   Create a closure with self attention module inside.
-        #   Encoder layers do not use the memory argument, because k and v are
-        #   the input from the previous layer
+        #   Wrap the self attention module in a Sublayer.
+        #   This Sublayer likely handles residual connections and normalization.
+        #   Encoder layers use the same input for query, key, and value (no separate memory input).
         self.self_attn_sublayer = Sublayer(sublayer_type="attention", 
                                            workhorse=self_attn_module,
                                            size=d_model, 
                                            dropout_prob=dropout_prob)
-
         # create feedforward sublayer
         pos_ff_module = PositionwiseFeedForwardNetwork(d_model, d_ff, dropout_prob) # TODO: "module" or "workhorse"?
         self.pos_ff_sublayer = Sublayer(sublayer_type="feedforward", 
@@ -333,9 +320,7 @@ class MultiHeadedAttentionModule(nn.Module):
             attention_mask_tensor = attention_mask.unsqueeze(1)
         else:
             attention_mask_tensor = None
-
         batch_size = query.size(0)
-
         # The w_q, w_k, w_v matrices compute the sized d_k derived query/key/value
         # vectors for all h attention heads in one operation. We then 
         # partition this into separate vectors for each attention head 

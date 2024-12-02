@@ -1,5 +1,6 @@
 artifacts*
 __pycache__
+__deprecated__
 *.pt
 *.pyc
 *py~
@@ -8,4 +9,7 @@ temp
 mlruns
 *.job
 *.out
+*.log
+*.txt
+*.json
 slurm*
